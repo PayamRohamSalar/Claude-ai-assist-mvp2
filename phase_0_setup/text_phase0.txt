@@ -1,0 +1,107 @@
+# ایجاد ساختار پروژه
+python project_structure.py
+
+# ایحاد محیط ایزوله
+cd D:\OneDrive\AI-Project\Claude-ai-assist-mvp2
+conda create -n claude-ai python=3.11
+conda activate claude-ai
+
+# تست نصب پکیج
+# تست نصب فقط چند پکیج اصلی برای اطمینان
+pip install pandas==2.1.4 fastapi==0.105.0 python-dotenv==1.0.0
+# تست موفقیت نصب
+python -c "import pandas, fastapi, dotenv; print('✅ تست موفق')"
+
+# بررسی فایل ایجاد شده
+ls  D:\OneDrive\AI-Project\cl-ai-mvp2\.env.template
+
+# بجای ls -la از این استفاده کنید:
+dir requirements.txt, .env.template, .gitignore
+# Or
+Get-ChildItem requirements.txt, .env.template, .gitignore
+
+# یا حتی ساده‌تر:
+ls requirements.txt
+ls .env.template  
+ls .gitignore
+
+# اجرای اسکریپت تست
+.\test_setup.ps1
+
+# بررسی فایل‌ها
+dir requirements.txt
+dir .env.template
+dir .gitignore
+
+# بررسی اندازه فایل‌ها
+Get-ChildItem requirements.txt, .env.template, .gitignore | Select-Object Name, Length
+
+# بررسی محیط conda
+conda info --envs
+
+# بررسی مدل‌های Ollama
+ollama list
+
+# فعالسازی محیط conda
+conda activate claude-ai
+
+# اجرای تست test_constants
+python test_constants.py
+# اجرای تست test_logger
+python test_logger.py
+
+# بررسی ساختار ایجاد شده
+dir data
+dir logs  
+dir config
+
+# بررسی دایرکتوری logs
+dir logs
+
+# مشاهده محتوای فایل log (اختیاری)
+Get-Content "logs\TestLogger.log" | Select-Object -Last 10
+
+pip install python-dotenv
+
+# اجرای تست کامل
+python test_config_manager.py
+
+# بررسی فایل config ایجاد شده
+dir config
+Get-Content "config\config.json" | Select-Object -First 10
+
+# تست سریع
+python -c "from shared_utils.config_manager import get_config; config = get_config(); print(f'✅ Config loaded: {config.project_name}'); print(f'🤖 LLM Model: {config.llm.ollama_model}')"
+
+
+pip install PyPDF2 python-docx chardet
+
+# اجرای تست کامل
+python test_file_utils.py
+# اجرای تست سریع
+python -c "from shared_utils import get_logger, read_document, PROJECT_NAME; print(f'✅ Package working: {PROJECT_NAME}')"
+
+# اجرای تست config.json
+python test_config_json.py
+
+# بررسی وجود فایل
+dir config\config.json
+
+# مشاهده بخشی از محتوا (اختیاری)
+Get-Content "config\config.json" | Select-Object -First 20
+
+# تست Integration
+python -c "from shared_utils.config_manager import ConfigManager; cm = ConfigManager(); config = cm.load_config(); print(f'✅ Config loaded: {config.project_name} v{config.version}')"
+
+# اجرای تست environment setup
+python test_environment_setup.py
+
+# نصب و تنظیم محیط
+python phase_0_setup/environment_setup.py
+
+# اجرای اعتبارسنجی کامل
+python phase_0_setup/validate_setup.py
+
+conda activate claude-ai
+cd "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2"
+python test_phase0_complete.py

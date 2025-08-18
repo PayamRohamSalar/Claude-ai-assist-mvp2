@@ -1,0 +1,199 @@
+# path: D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\.gitignore
+
+# ============================================================================
+# Legal Assistant AI - Git Ignore File
+# Files and directories to be ignored by Git
+# ============================================================================
+
+# Environment Variables (CRITICAL - Never commit!)
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.env/
+claude-ai/
+legal_assistant/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+legal_assistant.db
+vector_db/
+backup/
+
+# Log files
+logs/
+*.log
+*.log.*
+
+# Data files (sensitive content)
+data/raw/*
+data/processed_*/*
+!data/raw/README.md
+!data/*/README.md
+
+# Vector embeddings and models
+embeddings/
+models/
+*.npy
+*.pkl
+*.pickle
+chromadb/
+faiss_index/
+
+# Uploaded files
+uploads/
+temp/
+tmp/
+
+# Configuration secrets
+config/*.secret
+config/*.key
+private_config/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Windows specific
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# API documentation
+docs/build/
+site/
+
+# Profiling data
+*.prof
+
+# Large files that shouldn't be in git
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# Temporary Python files
+*.tmp
+*.temp
+*.cache
+
+# AI/ML specific
+checkpoints/
+experiments/
+wandb/
+mlruns/
+.mlflow/
+
+# Docker
+.dockerignore
+Dockerfile.local
+
+# Package files
+*.dmg
+*.iso
+*.tar
+*.zip
+
+# Node.js (if any frontend components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local development
+local_settings.py
+.local
+development.ini
+
+# My files
+storage/

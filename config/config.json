@@ -1,0 +1,80 @@
+{
+  "project_name": "Legal Assistant AI",
+  "version": "1.0.0",
+  "environment": "development",
+  "debug": true,
+  "database": {
+    "url": "sqlite:///legal_assistant.db",
+    "vector_db_path": "./data/vector_db",
+    "backup_path": "./backup/database",
+    "pool_size": 10,
+    "max_overflow": 20
+  },
+  "llm": {
+    "ollama_base_url": "http://localhost:11434",
+    "ollama_model": "qwen2.5:7b-instruct",
+    "ollama_backup_model": "mistral:7b",
+    "ollama_timeout": 300,
+    "ollama_context_length": 4096,
+    "openai_api_key": "",
+    "anthropic_api_key": "",
+    "temperature": 0.1,
+    "top_p": 0.9,
+    "max_tokens": 4096
+  },
+  "rag": {
+    "chunk_size": 1000,
+    "chunk_overlap": 200,
+    "min_chunk_size": 100,
+    "max_chunk_size": 2000,
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "persian_embedding_model": "HooshvareLab/bert-fa-base-uncased",
+    "vector_dimension": 384,
+    "similarity_threshold": 0.75,
+    "max_search_results": 10,
+    "search_timeout": 30
+  },
+  "processing": {
+    "max_concurrent_jobs": 4,
+    "batch_size": 50,
+    "max_file_size": 52428800,
+    "allowed_extensions": [".pdf", ".docx", ".doc", ".txt", ".json"],
+    "processing_timeout": 600
+  },
+  "web": {
+    "host": "localhost",
+    "port": 8000,
+    "reload": true,
+    "workers": 1,
+    "request_timeout": 30,
+    "max_connections": 100,
+    "cors_origins": ["http://localhost:3000", "http://localhost:8080"]
+  },
+  "security": {
+    "secret_key": "your_secret_key_here_change_in_production",
+    "algorithm": "HS256",
+    "access_token_expire_minutes": 30,
+    "password_salt": "your_salt_here",
+    "rate_limit_per_minute": 60,
+    "rate_limit_per_hour": 1000,
+    "rate_limit_per_day": 10000
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_max_size": "10MB",
+    "backup_count": 5,
+    "enable_json_logging": true,
+    "enable_console_logging": true
+  },
+  "features": {
+    "enable_document_comparison": true,
+    "enable_draft_generation": true,
+    "enable_advanced_search": true,
+    "enable_export": true,
+    "enable_cache": true,
+    "enable_profiling": false,
+    "mock_external_apis": false,
+    "use_sample_data": false
+  }
+}
