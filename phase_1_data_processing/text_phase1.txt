@@ -1,0 +1,28 @@
+# فعال‌سازی محیط
+conda activate claude-ai
+cd "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2"
+
+# تست فایل
+python phase_1_data_processing/document_splitter.py
+
+python phase_1_data_processing\text_cleaner.py
+
+python phase_1_data_processing\metadata_extractor.py
+
+python phase_1_data_processing\legal_structure_parser.py
+# Quick Test
+python -c "from phase_1_data_processing.legal_structure_parser import LegalStructureParser; print('✅ Import successful!')"
+# Test legal_structure_parser
+python -c "
+import sys
+sys.path.append('.')
+from phase_1_data_processing.legal_structure_parser import LegalStructureParser
+
+# Read from your text file
+with open('phase_1_data_processing/text_phase1.txt', 'r', encoding='utf-8') as f:
+    text = f.read()
+
+parser = LegalStructureParser()
+result = parser.parse(text)
+print(f'Parsed: {result.total_chapters} chapters, {result.total_articles} articles')
+"
