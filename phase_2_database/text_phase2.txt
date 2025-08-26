@@ -1,0 +1,3 @@
+python phase_2_database\database_creator.py
+
+python phase_2_database\data_importer.py

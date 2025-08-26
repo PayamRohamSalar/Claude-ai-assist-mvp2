@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "title": "آئین‌نامه آزمایشی",
+    "document_type": "آئین‌نامه",
+    "approval_authority": "هیئت وزیران",
+    "approval_date": "1402/02/20",
+    "effective_date": "1402/03/01",
+    "section": "بخش دوم",
+    "document_number": "TEST-002",
+    "subject": "آزمایش آئین‌نامه",
+    "keywords": [
+      "آئین‌نامه",
+      "آزمایش"
+    ],
+    "confidence_score": 0.88
+  },
+  "structure": {
+    "chapters": [
+      {
+        "title": "فصل واحد",
+        "articles": [
+          {
+            "number": "1",
+            "text": "این آئین‌نامه به منظور اجرای قانون مربوطه وضع شده است.",
+            "notes": []
+          }
+        ]
+      }
+    ]
+  }
+}

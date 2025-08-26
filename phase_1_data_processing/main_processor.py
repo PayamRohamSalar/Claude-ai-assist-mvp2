@@ -197,7 +197,7 @@ class Phase1Processor:
             metadata = self._extract_metadata(content, file_path.name)
             
             # Step 3: Parse legal structure
-            parsed_structure = self.legal_parser.parse(clean_result["normalized"])
+            parsed_structure = self.legal_parser.parse(clean_result["normalized_text"])
             
             # Step 4: Build and save JSON
             doc_json = self.json_formatter.build_document_json(
@@ -218,7 +218,7 @@ class Phase1Processor:
             result.metadata_title = metadata.title
             result.articles_count = parsed_structure.total_articles
             result.notes_count = parsed_structure.total_notes
-            result.chars_clean = len(clean_result["normalized"])
+            result.chars_clean = len(clean_result["normalized_text"])
             
             # Add to collections
             self.all_documents.append(doc_json)

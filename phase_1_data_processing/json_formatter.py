@@ -79,11 +79,19 @@ class JsonFormatter:
         }
         
         # Build content variants section
-        content_variants = {
-            "normalized": clean.normalized_text,
-            "ascii_digits": clean.ascii_digits_text,
-            "persian_digits": clean.persian_digits_text
-        }
+        # Handle both dictionary and object formats for clean parameter
+        if isinstance(clean, dict):
+            content_variants = {
+                "normalized": clean.get("normalized_text", ""),
+                "ascii_digits": clean.get("ascii_digits_text", ""),
+                "persian_digits": clean.get("persian_digits_text", "")
+            }
+        else:
+            content_variants = {
+                "normalized": clean.normalized_text,
+                "ascii_digits": clean.ascii_digits_text,
+                "persian_digits": clean.persian_digits_text
+            }
         
         # Build structure section
         structure = {
@@ -114,10 +122,17 @@ class JsonFormatter:
             structure["chapters"].append(chapter_dict)
         
         # Build stats section
-        stats = {
-            "chars_original": len(clean.original_text) if hasattr(clean, 'original_text') else 0,
-            "chars_clean": len(clean.normalized_text)
-        }
+        # Handle both dictionary and object formats for clean parameter
+        if isinstance(clean, dict):
+            stats = {
+                "chars_original": len(clean.get("original_text", "")),
+                "chars_clean": len(clean.get("normalized_text", ""))
+            }
+        else:
+            stats = {
+                "chars_original": len(clean.original_text) if hasattr(clean, 'original_text') else 0,
+                "chars_clean": len(clean.normalized_text)
+            }
         
         # Build processing section
         processing = {

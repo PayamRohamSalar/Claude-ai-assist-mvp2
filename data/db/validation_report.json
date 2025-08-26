@@ -1,0 +1,17 @@
+{
+  "total_files": 4,
+  "documents_processed": 2,
+  "documents_inserted": 2,
+  "documents_updated": 0,
+  "documents_skipped": 0,
+  "documents_failed": 1,
+  "chapters_inserted": 2,
+  "articles_inserted": 3,
+  "notes_inserted": 1,
+  "clauses_inserted": 1,
+  "errors": [
+    "Failed to process file malformed.json: Expecting value: line 1 column 13 (char 12)"
+  ],
+  "import_completed_at": "2025-08-26T11:48:26.788718",
+  "success_rate": 100.0
+}
