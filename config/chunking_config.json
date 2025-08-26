@@ -1,0 +1,27 @@
+{
+  "chunking": {
+    "max_chunk_chars": 1000,
+    "min_chunk_chars": 100,
+    "overlap_chars": 150,
+    "overlap_ratio": 0.15,
+    "sentence_boundaries": {
+      "primary": [".", "؟", "!", "…"],
+      "secondary": ["،", "؛"]
+    },
+    "preserve_headers": ["تبصره", "بند", "ماده", "فصل"],
+    "whitespace_normalization": {
+      "normalize_spaces": true,
+      "preserve_original": true,
+      "remove_extra_newlines": true
+    },
+    "splitting_strategy": "sentence_aware",
+    "prefer_article_chunks": true,
+    "split_long_notes": true,
+    "split_long_clauses": false
+  },
+  "output": {
+    "chunks_file": "data/processed_phase_3/chunks.json",
+    "preserve_formatting": true,
+    "include_statistics": true
+  }
+}

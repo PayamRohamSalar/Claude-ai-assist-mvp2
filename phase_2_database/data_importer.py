@@ -394,6 +394,202 @@ def process_document_structure(conn: sqlite3.Connection, document_id: int,
             stats.errors.append(error_msg)
 
 
+def convert_multi_doc_to_single_docs(multi_doc_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Convert multi-document JSON format to list of single-document formats.
+    
+    Converts from:
+    {
+        "documents": [
+            {"document_id": "DOC_001", "title": "...", "content": "..."},
+            ...
+        ]
+    }
+    
+    To:
+    [
+        {
+            "metadata": {"title": "...", ...},
+            "structure": {"chapters": [...]}
+        },
+        ...
+    ]
+    """
+    single_docs = []
+    
+    if 'documents' not in multi_doc_data or not isinstance(multi_doc_data['documents'], list):
+        return single_docs
+    
+    for doc in multi_doc_data['documents']:
+        if not isinstance(doc, dict):
+            continue
+            
+        # Extract basic metadata from multi-doc format
+        title = doc.get('title', '')
+        approval_date = doc.get('approval_date', '')
+        approval_authority = doc.get('approval_authority', '')
+        document_type = doc.get('document_type', '')
+        content = doc.get('content', '')
+        
+        # Create metadata structure compatible with single-doc format
+        metadata = {
+            'title': title,
+            'document_type': document_type,
+            'approval_authority': approval_authority,
+            'approval_date': approval_date,
+            'effective_date': '',  # Not available in multi-doc format
+            'section_name': multi_doc_data.get('section_info', {}).get('section_title', ''),
+            'document_number': doc.get('document_id', ''),
+            'subject': '',  # Not available in multi-doc format
+            'keywords': [],  # Not available in multi-doc format
+            'related_docs': [],  # Not available in multi-doc format
+            'confidence_score': 0.9  # Default value
+        }
+        
+        # For multi-doc format, we need to parse the content to create structure
+        # Since we don't have legal structure parser available here, 
+        # we'll create a basic structure with one chapter and article
+        structure = {
+            'chapters': [
+                {
+                    'title': 'محتوای اصلی',  # Main content
+                    'articles': [
+                        {
+                            'number': '1',
+                            'text': content,
+                            'notes': [],
+                            'clauses': []
+                        }
+                    ]
+                }
+            ],
+            'totals': {
+                'chapters': 1,
+                'articles': 1,
+                'notes': 0
+            }
+        }
+        
+        # Create single-document structure
+        single_doc = {
+            'metadata': metadata,
+            'structure': structure,
+            'stats': {
+                'chars_original': len(content) if content else 0,
+                'chars_clean': len(content) if content else 0
+            },
+            'processing': {
+                'source_filename': multi_doc_data.get('source_file', ''),
+                'timestamp_utc': multi_doc_data.get('processing_date', ''),
+                'duration_ms': 0,
+                'pipeline_versions': {
+                    'data_importer': '2.0.0'
+                }
+            }
+        }
+        
+        single_docs.append(single_doc)
+    
+    return single_docs
+
+
+def detect_json_format(json_data: Dict[str, Any]) -> str:
+    """
+    Detect the format of the JSON file.
+    
+    Returns:
+        'single': Single document with root-level 'metadata'
+        'multi': Multi-document with 'documents' array
+        'other': Other format
+    """
+    if isinstance(json_data, dict):
+        # Prioritize multi-document format - check for documents array first
+        if 'documents' in json_data and isinstance(json_data['documents'], list):
+            # Additional validation for multi-doc format
+            if 'document_count' in json_data or len(json_data['documents']) > 0:
+                return 'multi'
+        # Then check for single-document format with structure
+        elif 'metadata' in json_data and 'structure' in json_data:
+            return 'single'
+        # Fallback: check for metadata only
+        elif 'metadata' in json_data:
+            return 'single'
+    
+    return 'other'
+
+
+def process_single_document(doc_data: Dict[str, Any], source_file: str, 
+                           conn: sqlite3.Connection, stats, logger) -> bool:
+    """
+    Process a single document (either from single-doc or multi-doc format).
+    
+    Args:
+        doc_data: Document data in single-document format
+        source_file: Source file path for logging
+        conn: Database connection
+        stats: Import statistics object
+        logger: Logger instance
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Extract metadata for UID computation
+        metadata = doc_data.get('metadata', {})
+        title = metadata.get('title', 'Unknown Document')
+        approval_date = metadata.get('approval_date', '')
+        
+        # Compute document UID
+        document_uid = compute_document_uid(title, approval_date)
+        
+        # Start transaction for this document
+        conn.execute('BEGIN')
+        
+        try:
+            # Check if document already exists
+            existing_doc_id = check_document_exists(conn, document_uid)
+            
+            if existing_doc_id:
+                logger.info(f"Document already exists, updating: {title}")
+                logger.info(f"سند قبلاً وجود دارد، در حال به‌روزرسانی: {title}")
+                
+                update_document(conn, existing_doc_id, doc_data, source_file, logger)
+                document_id = existing_doc_id
+                stats.documents_updated += 1
+            else:
+                logger.info(f"Inserting new document: {title}")
+                logger.info(f"در حال وارد کردن سند جدید: {title}")
+                
+                document_id = insert_document(conn, doc_data, document_uid, 
+                                            source_file, logger)
+            
+            # Process document structure (chapters, articles, notes, clauses)
+            process_document_structure(conn, document_id, doc_data, stats, logger)
+            
+            # Commit transaction
+            conn.commit()
+            
+            logger.info(f"Successfully processed document: {title}")
+            logger.info(f"سند با موفقیت پردازش شد: {title}")
+            
+            return True
+            
+        except Exception as e:
+            # Rollback transaction on error
+            conn.rollback()
+            error_msg = f"Failed to import document {title}: {e}"
+            logger.error(error_msg)
+            logger.error(f"خطا در وارد کردن سند {title}: {e}")
+            stats.errors.append(error_msg)
+            return False
+            
+    except Exception as e:
+        error_msg = f"Error processing document from {source_file}: {e}"
+        logger.error(error_msg)
+        stats.errors.append(error_msg)
+        return False
+
+
 def import_documents(input_dir: Union[str, Path], 
                     conn: sqlite3.Connection) -> Dict[str, Any]:
     """
@@ -444,62 +640,46 @@ def import_documents(input_dir: Union[str, Path],
             
             # Load JSON data
             with open(json_file, 'r', encoding='utf-8') as f:
-                doc_data = json.load(f)
+                json_data = json.load(f)
             
-            # Skip non-document files (like metadata files)
-            if not isinstance(doc_data, dict) or 'metadata' not in doc_data:
+            # Detect JSON format
+            json_format = detect_json_format(json_data)
+            
+            if json_format == 'other':
                 logger.info(f"Skipping non-document file: {json_file.name}")
+                logger.info(f"رد کردن فایل غیر سندی: {json_file.name}")
                 continue
-            
-            stats.documents_processed += 1
-            
-            # Extract metadata for UID computation
-            metadata = doc_data.get('metadata', {})
-            title = metadata.get('title', json_file.stem)
-            approval_date = metadata.get('approval_date', '')
-            
-            # Compute document UID
-            document_uid = compute_document_uid(title, approval_date)
-            
-            # Start transaction for this document
-            conn.execute('BEGIN')
-            
-            try:
-                # Check if document already exists
-                existing_doc_id = check_document_exists(conn, document_uid)
+            elif json_format == 'multi':
+                logger.info(f"Processing multi-document file with {json_data.get('document_count', 0)} documents: {json_file.name}")
+                logger.info(f"پردازش فایل چندسندی با {json_data.get('document_count', 0)} سند: {json_file.name}")
                 
-                if existing_doc_id:
-                    logger.info(f"Document already exists, updating: {title}")
-                    logger.info(f"سند قبلاً وجود دارد، در حال به‌روزرسانی: {title}")
+                # Convert multi-document to single documents
+                single_docs = convert_multi_doc_to_single_docs(json_data)
+                
+                # Process each document
+                for doc_data in single_docs:
+                    if not doc_data or not isinstance(doc_data, dict):
+                        continue
                     
-                    update_document(conn, existing_doc_id, doc_data, str(json_file), logger)
-                    document_id = existing_doc_id
-                    stats.documents_updated += 1
-                else:
-                    logger.info(f"Inserting new document: {title}")
-                    logger.info(f"در حال وارد کردن سند جدید: {title}")
-                    
-                    document_id = insert_document(conn, doc_data, document_uid, 
-                                                str(json_file), logger)
+                    stats.documents_processed += 1
+                    success = process_single_document(doc_data, str(json_file), conn, stats, logger)
+                    if success:
+                        stats.documents_inserted += 1
+                    else:
+                        stats.documents_failed += 1
+                
+                continue
+            else:
+                # Single document format
+                doc_data = json_data
+                stats.documents_processed += 1
+                
+                # Process single document
+                success = process_single_document(doc_data, str(json_file), conn, stats, logger)
+                if success:
                     stats.documents_inserted += 1
-                
-                # Process document structure (chapters, articles, notes, clauses)
-                process_document_structure(conn, document_id, doc_data, stats, logger)
-                
-                # Commit transaction
-                conn.commit()
-                
-                logger.info(f"Successfully processed: {json_file.name}")
-                logger.info(f"با موفقیت پردازش شد: {json_file.name}")
-                
-            except Exception as e:
-                # Rollback transaction on error
-                conn.rollback()
-                error_msg = f"Failed to import document {json_file.name}: {e}"
-                logger.error(error_msg)
-                logger.error(f"خطا در وارد کردن سند {json_file.name}: {e}")
-                stats.errors.append(error_msg)
-                stats.documents_failed += 1
+                else:
+                    stats.documents_failed += 1
                 
         except Exception as e:
             error_msg = f"Failed to process file {json_file.name}: {e}"

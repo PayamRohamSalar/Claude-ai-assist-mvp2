@@ -1,17 +1,15 @@
 {
-  "total_files": 4,
-  "documents_processed": 2,
-  "documents_inserted": 2,
-  "documents_updated": 0,
+  "total_files": 7,
+  "documents_processed": 21,
+  "documents_inserted": 21,
+  "documents_updated": 2,
   "documents_skipped": 0,
-  "documents_failed": 1,
-  "chapters_inserted": 2,
-  "articles_inserted": 3,
-  "notes_inserted": 1,
-  "clauses_inserted": 1,
-  "errors": [
-    "Failed to process file malformed.json: Expecting value: line 1 column 13 (char 12)"
-  ],
-  "import_completed_at": "2025-08-26T11:48:26.788718",
-  "success_rate": 100.0
+  "documents_failed": 0,
+  "chapters_inserted": 21,
+  "articles_inserted": 21,
+  "notes_inserted": 0,
+  "clauses_inserted": 0,
+  "errors": [],
+  "import_completed_at": "2025-08-26T14:10:37.085128",
+  "success_rate": 109.52380952380953
 }
