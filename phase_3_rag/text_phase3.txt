@@ -1,0 +1,4 @@
+
+pip install sentence-transformers
+
+python phase_3_rag\embedding_generator.py
