@@ -100,26 +100,18 @@ def insert_document(conn: sqlite3.Connection, doc_data: Dict[str, Any],
     
     cursor.execute("""
         INSERT INTO documents (
-            document_uid, title, document_type, section,
-            approval_authority, approval_date, effective_date,
-            document_number, subject, keywords, confidence_score,
-            source_file, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            document_uid, title, document_type, 
+            approval_authority, approval_date, section_name, 
+            confidence_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (
         document_uid,
         metadata.get('title'),
         metadata.get('document_type'),
-        metadata.get('section'),
         metadata.get('approval_authority'),
         metadata.get('approval_date'),
-        metadata.get('effective_date'),
-        metadata.get('document_number'),
-        metadata.get('subject'),
-        json.dumps(metadata.get('keywords', []) if metadata.get('keywords') else []),
-        metadata.get('confidence_score', 0.0),
-        source_file,
-        datetime.now().isoformat(),
-        datetime.now().isoformat()
+        metadata.get('section_name'),
+        metadata.get('confidence_score', 0.0)
     ))
     
     document_id = cursor.lastrowid
@@ -164,24 +156,17 @@ def update_document(conn: sqlite3.Connection, document_id: int,
     
     cursor.execute("""
         UPDATE documents SET 
-            title = ?, document_type = ?, section = ?,
-            approval_authority = ?, approval_date = ?, effective_date = ?,
-            document_number = ?, subject = ?, keywords = ?, 
-            confidence_score = ?, source_file = ?, updated_at = ?
+            title = ?, document_type = ?, section_name = ?,
+            approval_authority = ?, approval_date = ?, 
+            confidence_score = ?
         WHERE id = ?
     """, (
         metadata.get('title'),
         metadata.get('document_type'),
-        metadata.get('section'),
+        metadata.get('section_name'),
         metadata.get('approval_authority'),
         metadata.get('approval_date'),
-        metadata.get('effective_date'),
-        metadata.get('document_number'),
-        metadata.get('subject'),
-        json.dumps(metadata.get('keywords', []) if metadata.get('keywords') else []),
         metadata.get('confidence_score', 0.0),
-        source_file,
-        datetime.now().isoformat(),
         document_id
     ))
     

@@ -1,15 +1,19 @@
 {
-  "total_files": 7,
-  "documents_processed": 21,
-  "documents_inserted": 21,
-  "documents_updated": 2,
+  "total_files": 4,
+  "documents_processed": 2,
+  "documents_inserted": 0,
+  "documents_updated": 0,
   "documents_skipped": 0,
-  "documents_failed": 0,
-  "chapters_inserted": 21,
-  "articles_inserted": 21,
+  "documents_failed": 3,
+  "chapters_inserted": 0,
+  "articles_inserted": 0,
   "notes_inserted": 0,
   "clauses_inserted": 0,
-  "errors": [],
-  "import_completed_at": "2025-08-26T14:10:37.085128",
-  "success_rate": 109.52380952380953
+  "errors": [
+    "Failed to process file malformed.json: Expecting value: line 1 column 13 (char 12)",
+    "Failed to import document قانون آزمایشی اول: NOT NULL constraint failed: documents.id",
+    "Failed to import document قانون آزمایشی دوم: NOT NULL constraint failed: documents.id"
+  ],
+  "import_completed_at": "2025-08-27T12:22:07.798985",
+  "success_rate": 0.0
 }

@@ -203,9 +203,43 @@ def has_header_marker(text: str, config: ChunkingConfig) -> bool:
     return False
 
 
+def find_header_markers(text: str) -> List[Tuple[int, str]]:
+    """
+    Find all header markers (تبصره and بند) in text using regex.
+    
+    Args:
+        text: Text to search for header markers
+        
+    Returns:
+        List of tuples (position, matched_text) for each header marker found
+    """
+    header_pattern = r'\b(تبصره\s+\d+|بند\s+[\u0627-\u06CC]+)\b'
+    matches = []
+    
+    for match in re.finditer(header_pattern, text):
+        matches.append((match.start(), match.group()))
+    
+    return matches
+
+
+def count_header_markers_in_chunk(chunk_text: str) -> int:
+    """
+    Count the number of header markers in a chunk.
+    
+    Args:
+        chunk_text: Text chunk to analyze
+        
+    Returns:
+        int: Number of header markers found
+    """
+    markers = find_header_markers(chunk_text)
+    return len(markers)
+
+
 def split_text_into_chunks(text: str, config: ChunkingConfig) -> List[str]:
     """
     Split text into chunks according to configuration rules.
+    Enhanced to handle header markers (تبصره and بند) properly.
     
     Args:
         text: Text to split
@@ -214,14 +248,47 @@ def split_text_into_chunks(text: str, config: ChunkingConfig) -> List[str]:
     Returns:
         List of text chunks
     """
+    logger = get_logger(__name__)
+    
     if not text or len(text) <= config.min_chunk_chars:
         return [text] if text else []
     
-    # If text is short enough, return as single chunk
+    # Step 1: Find header markers (تبصره and بند)
+    header_markers = find_header_markers(text)
+    
+    # Step 2: If multiple header markers found, split at each header position
+    if len(header_markers) > 1:
+        logger.debug(f"Found {len(header_markers)} header markers, splitting text")
+        
+        subtexts = []
+        last_pos = 0
+        
+        for pos, marker in header_markers:
+            if pos > last_pos:
+                # Add text before this marker
+                subtexts.append(text[last_pos:pos].strip())
+            last_pos = pos
+        
+        # Add remaining text after last marker
+        if last_pos < len(text):
+            subtexts.append(text[last_pos:].strip())
+        
+        # Remove empty subtexts
+        subtexts = [subtext for subtext in subtexts if subtext.strip()]
+        
+        # Recursively process each subtext
+        all_chunks = []
+        for subtext in subtexts:
+            subtext_chunks = split_text_into_chunks(subtext, config)
+            all_chunks.extend(subtext_chunks)
+        
+        return all_chunks
+    
+    # Step 3: If text is short enough, return as single chunk
     if len(text) <= config.max_chunk_chars:
         return [text]
     
-    # Check if text has header that should not be split
+    # Step 4: Check if text has header that should not be split
     if has_header_marker(text, config):
         # Find end of header line
         first_newline = text.find('\n')
@@ -237,6 +304,7 @@ def split_text_into_chunks(text: str, config: ChunkingConfig) -> List[str]:
                 rest_chunks = [header]
             return rest_chunks
     
+    # Step 5: Apply sentence-based or size-based chunking
     chunks = []
     boundaries = find_sentence_boundaries(text, config)
     
@@ -275,7 +343,16 @@ def split_text_into_chunks(text: str, config: ChunkingConfig) -> List[str]:
     if current_chunk.strip():
         chunks.append(current_chunk.strip())
     
-    return [chunk for chunk in chunks if chunk.strip()]
+    # Step 6: Validate that each chunk has at most one header marker
+    final_chunks = []
+    for chunk in chunks:
+        if chunk.strip():
+            header_count = count_header_markers_in_chunk(chunk)
+            if header_count > 1:
+                logger.warning(f"Chunk contains {header_count} header markers, may affect retrieval granularity")
+            final_chunks.append(chunk.strip())
+    
+    return final_chunks
 
 
 def get_database_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
@@ -424,7 +501,8 @@ def process_document_row(row: Dict[str, Any], config: ChunkingConfig) -> List[Do
             metadata={
                 'original_text_length': len(primary_text),
                 'total_chunks_for_source': len(text_chunks),
-                'is_header_preserved': has_header_marker(chunk_text, config)
+                'has_header_marker': has_header_marker(chunk_text, config),
+                'header_marker_count': count_header_markers_in_chunk(chunk_text)
             }
         )
         

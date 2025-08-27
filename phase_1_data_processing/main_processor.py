@@ -19,6 +19,9 @@ from shared_utils.logger import get_logger
 from shared_utils.constants import RAW_DATA_DIR, PROCESSED_PHASE_1_DIR, Messages
 
 # Import pipeline components
+from .document_splitter import DocumentSplitter, SplitResult
+from .text_cleaner import PersianTextCleaner
+from .metadata_extractor import PersianMetadataExtractor, DocumentMetadata
 from .legal_structure_parser import LegalStructureParser, ParsedStructure
 from .json_formatter import JsonFormatter
 
@@ -72,6 +75,9 @@ class Phase1Processor:
         self.out_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize pipeline components
+        self.document_splitter = DocumentSplitter()
+        self.text_cleaner = PersianTextCleaner()
+        self.metadata_extractor = PersianMetadataExtractor()
         self.legal_parser = LegalStructureParser()
         self.json_formatter = JsonFormatter(self.out_dir)
         
@@ -82,6 +88,9 @@ class Phase1Processor:
         
         # Pipeline versions for tracking
         self.pipeline_versions = {
+            "document_splitter": "1.0.0",
+            "text_cleaner": "1.0.0",
+            "metadata_extractor": "1.0.0",
             "legal_structure_parser": "1.0.0",
             "json_formatter": "1.0.0",
             "main_processor": "1.0.0"
@@ -144,62 +153,49 @@ class Phase1Processor:
         logger.info(f"Processing file: {file_path.name}")
         
         try:
-            # Read file content
-            content = self._read_file_content(file_path)
-            if not content:
-                logger.warning(f"Empty or unreadable file: {file_path.name}")
+            # Use DocumentSplitter to get SplitResult objects
+            split_results = self.document_splitter.split_file(file_path)
+            
+            if not split_results:
+                logger.warning(f"No documents found in file: {file_path.name}")
                 return
             
-            # For now, treat each file as a single document
-            # In a full implementation, DocumentSplitter would be used here
-            splits = [{"content": content, "metadata": {}}]
+            logger.info(f"Found {len(split_results)} document(s) in {file_path.name}")
             
-            # Process each split
-            for split_idx, split in enumerate(splits):
-                self._process_split(file_path, split_idx, split)
+            # Process each split result
+            for split_result in split_results:
+                self._process_split_result(file_path, split_result)
                 
         except Exception as e:
             error_msg = f"Error processing file {file_path.name}: {e}"
             logger.error(error_msg)
             self.errors.append(error_msg)
     
-    def _read_file_content(self, file_path: Path) -> Optional[str]:
-        """Read content from a file."""
-        try:
-            if file_path.suffix.lower() in {'.txt', '.json'}:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    return f.read()
-            else:
-                # For other formats, return a placeholder
-                # In full implementation, proper document readers would be used
-                return f"Content from {file_path.name}"
-        except Exception as e:
-            logger.error(f"Failed to read file {file_path.name}: {e}")
-            return None
     
-    def _process_split(self, file_path: Path, split_idx: int, split: Dict[str, Any]) -> None:
-        """Process a single document split."""
+    def _process_split_result(self, file_path: Path, split_result: SplitResult) -> None:
+        """Process a single document split result."""
         start_time = time.time()
         result = ProcessingResult(
             source_file=file_path.name,
-            split_index=split_idx,
+            split_index=split_result.idx,
             success=False,
             duration_ms=0.0
         )
         
         try:
-            content = split["content"]
+            # Step 1: Read text content from SplitResult
+            content = split_result.content
             
-            # Step 1: Clean text (simplified - in full implementation, TextCleaner would be used)
-            clean_result = self._clean_text(content)
+            # Step 2: Clean and normalize text using TextCleaner
+            clean_result = self._create_clean_result(content)
             
-            # Step 2: Extract metadata (simplified - in full implementation, MetadataExtractor would be used)
-            metadata = self._extract_metadata(content, file_path.name)
+            # Step 3: Extract metadata using PersianMetadataExtractor
+            metadata = self.metadata_extractor.extract_metadata(content)
             
-            # Step 3: Parse legal structure
+            # Step 4: Parse legal structure using normalized text
             parsed_structure = self.legal_parser.parse(clean_result["normalized_text"])
             
-            # Step 4: Build and save JSON
+            # Step 5: Build and save JSON using JsonFormatter
             doc_json = self.json_formatter.build_document_json(
                 metadata=metadata,
                 clean=clean_result,
@@ -215,7 +211,7 @@ class Phase1Processor:
             # Update result
             result.success = True
             result.document_path = str(doc_path)
-            result.metadata_title = metadata.title
+            result.metadata_title = metadata.title if hasattr(metadata, 'title') else split_result.title
             result.articles_count = parsed_structure.total_articles
             result.notes_count = parsed_structure.total_notes
             result.chars_clean = len(clean_result["normalized_text"])
@@ -223,10 +219,10 @@ class Phase1Processor:
             # Add to collections
             self.all_documents.append(doc_json)
             
-            logger.info(f"Successfully processed split {split_idx} from {file_path.name}")
+            logger.info(f"Successfully processed split {split_result.idx} from {file_path.name}")
             
         except Exception as e:
-            error_msg = f"Error processing split {split_idx} from {file_path.name}: {e}"
+            error_msg = f"Error processing split {split_result.idx} from {file_path.name}: {e}"
             logger.error(error_msg)
             result.error_message = error_msg
             self.errors.append(error_msg)
@@ -234,23 +230,22 @@ class Phase1Processor:
         finally:
             result.duration_ms = (time.time() - start_time) * 1000
             self.processing_results.append(result)
-    
-    def _clean_text(self, content: str) -> Dict[str, str]:
-        """Clean and normalize text (simplified implementation)."""
-        # In full implementation, this would use TextCleaner
-        normalized = content.strip()
+    def _create_clean_result(self, content: str) -> Dict[str, str]:
+        """Create clean result dictionary using PersianTextCleaner."""
+        # Clean the text using PersianTextCleaner
+        normalized_text = self.text_cleaner.clean_text(content)
         
-        # Convert Persian digits to ASCII
-        ascii_digits = self._persian_to_ascii_digits(normalized)
+        # Convert Persian digits to ASCII for one variant
+        ascii_digits_text = self._persian_to_ascii_digits(normalized_text)
         
         # Keep Persian digits version
-        persian_digits = normalized
+        persian_digits_text = normalized_text
         
         return {
             "original_text": content,
-            "normalized_text": normalized,
-            "ascii_digits_text": ascii_digits,
-            "persian_digits_text": persian_digits
+            "normalized_text": normalized_text,
+            "ascii_digits_text": ascii_digits_text,
+            "persian_digits_text": persian_digits_text
         }
     
     def _persian_to_ascii_digits(self, text: str) -> str:
@@ -264,27 +259,6 @@ class Phase1Processor:
             text = text.replace(persian, ascii_digit)
         
         return text
-    
-    def _extract_metadata(self, content: str, filename: str) -> Any:
-        """Extract metadata from content (simplified implementation)."""
-        # In full implementation, this would use MetadataExtractor
-        # For now, create a simple metadata object
-        
-        class SimpleMetadata:
-            def __init__(self):
-                self.title = f"Document from {filename}"
-                self.document_type = "قانون"
-                self.approval_authority = "مجلس شورای اسلامی"
-                self.approval_date = ""
-                self.effective_date = ""
-                self.section_name = "بخش دوم - قوانین"
-                self.document_number = ""
-                self.subject = ""
-                self.keywords = []
-                self.related_docs = []
-                self.confidence_score = 0.8
-        
-        return SimpleMetadata()
     
     def _update_aggregate_files(self) -> None:
         """Update aggregate index files."""

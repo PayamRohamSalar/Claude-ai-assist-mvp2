@@ -11,6 +11,7 @@ Version: 2.0
 import os
 import sys
 import sqlite3
+import argparse
 from pathlib import Path
 from typing import Optional
 
@@ -25,7 +26,7 @@ class DatabaseCreationError(Exception):
     pass
 
 
-def init_database(db_path: Optional[str] = None) -> sqlite3.Connection:
+def init_database(db_path: Optional[str] = None, recreate: bool = False) -> sqlite3.Connection:
     """
     Initialize the Legal Assistant AI database with the defined schema.
     
@@ -36,6 +37,7 @@ def init_database(db_path: Optional[str] = None) -> sqlite3.Connection:
     Args:
         db_path (Optional[str]): Path to the database file. If None, uses
                                 configuration default or environment variable.
+        recreate (bool): If True, drop existing database and recreate it.
     
     Returns:
         sqlite3.Connection: Active database connection with proper configuration.
@@ -74,6 +76,14 @@ def init_database(db_path: Optional[str] = None) -> sqlite3.Connection:
             os.makedirs(db_dir, exist_ok=True)
             logger.info(f"Created database directory: {db_dir}")
             logger.info(f"پوشه پایگاه داده ایجاد شد: {db_dir}")
+        
+        # Handle recreate flag
+        if recreate and os.path.exists(db_path):
+            logger.info("Recreate flag set, removing existing database...")
+            logger.info("پرچم بازسازی تنظیم شده، حذف پایگاه داده موجود...")
+            os.remove(db_path)
+            logger.info("Existing database removed")
+            logger.info("پایگاه داده موجود حذف شد")
         
         # Establish database connection
         logger.info("Establishing database connection...")
@@ -226,24 +236,33 @@ def main() -> None:
     """
     Main entry point for CLI execution.
     
-    Accepts optional database path as command line argument.
-    Usage: python database_creator.py [db_path]
+    Accepts optional database path and flags as command line arguments.
+    Usage: python database_creator.py [--db-path PATH] [--recreate]
     """
     logger = get_logger(__name__)
     
     try:
         # Parse command line arguments
-        db_path = None
-        if len(sys.argv) > 1:
-            db_path = sys.argv[1]
-            logger.info(f"Using database path from command line: {db_path}")
-            logger.info(f"استفاده از مسیر پایگاه داده از خط فرمان: {db_path}")
+        parser = argparse.ArgumentParser(description="Initialize Legal Assistant AI Database")
+        parser.add_argument('--db-path', type=str, help='Path to the database file')
+        parser.add_argument('--recreate', action='store_true', 
+                          help='Drop existing database and recreate it')
+        
+        args = parser.parse_args()
+        
+        if args.db_path:
+            logger.info(f"Using database path from command line: {args.db_path}")
+            logger.info(f"استفاده از مسیر پایگاه داده از خط فرمان: {args.db_path}")
+        
+        if args.recreate:
+            logger.info("Recreate flag enabled")
+            logger.info("پرچم بازسازی فعال است")
         
         # Initialize database
         logger.info("Starting database initialization from CLI...")
         logger.info("شروع راه‌اندازی پایگاه داده از خط فرمان...")
         
-        connection = init_database(db_path)
+        connection = init_database(args.db_path, args.recreate)
         
         # Perform health check
         if check_database_health(connection):

@@ -35,6 +35,24 @@ class DocumentMetadata:
     extraction_confidence: float = 0.0
     extraction_method: str = "regex"
     extraction_timestamp: str = ""
+    # Additional attributes expected by JsonFormatter
+    effective_date: Optional[str] = None
+    section_name: Optional[str] = None
+    document_number: Optional[str] = None
+    subject: Optional[str] = None
+    keywords: List[str] = None
+    related_docs: List[str] = None
+    confidence_score: float = 0.0
+    
+    def __post_init__(self):
+        """Initialize default values for list fields."""
+        if self.keywords is None:
+            self.keywords = []
+        if self.related_docs is None:
+            self.related_docs = []
+        # Use extraction_confidence as confidence_score if not set
+        if self.confidence_score == 0.0 and self.extraction_confidence > 0.0:
+            self.confidence_score = self.extraction_confidence
 
 
 class PersianMetadataExtractor:

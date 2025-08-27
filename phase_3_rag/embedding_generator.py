@@ -194,7 +194,14 @@ class EmbeddingGenerator:
             str: MD5 hash string
         """
         # Create a consistent string representation of chunks for hashing
-        chunk_texts = [chunk.get('content', '') for chunk in chunks]
+        chunk_texts = []
+        for chunk in chunks:
+            # Use text first, fallback to normalized_text
+            text = chunk.get('text', '')
+            if not text:
+                text = chunk.get('normalized_text', '')
+            chunk_texts.append(text)
+        
         combined_text = '\n'.join(chunk_texts)
         return hashlib.md5(combined_text.encode('utf-8')).hexdigest()
     
@@ -244,15 +251,19 @@ class EmbeddingGenerator:
         chunk_uids = []
         
         for chunk in self.chunks:
-            # Support both 'content' and 'text' fields for content
-            content = chunk.get('content', chunk.get('text', chunk.get('normalized_text', ''))).strip()
+            # Use text as primary content, fallback to normalized_text
+            content = chunk.get('text', '').strip()
+            if not content:
+                content = chunk.get('normalized_text', '').strip()
+            
             # Support both 'uid' and 'chunk_uid' fields for UID
             uid = chunk.get('uid', chunk.get('chunk_uid', ''))
             
+            # Validate content
             if not content:
-                logger.warning(f"قطعه خالی یافت شد با UID: {uid}")
-                logger.warning(f"Empty chunk found with UID: {uid}")
-                content = ""  # Keep empty content for alignment
+                error_msg = f"قطعه بدون متن یافت شد با UID: {uid}\nChunk with no text content found with UID: {uid}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             
             if not uid:
                 logger.error("قطعه بدون UID یافت شد")

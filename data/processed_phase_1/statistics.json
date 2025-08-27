@@ -2,14 +2,14 @@
   "summary": {
     "total_documents": 1,
     "total_articles": 1,
-    "total_notes": 0,
-    "total_chars_clean": 30
+    "total_notes": 1,
+    "total_chars_clean": 704
   },
   "averages": {
     "articles_per_document": 1.0,
-    "notes_per_document": 0.0,
-    "chars_per_document": 30.0
+    "notes_per_document": 1.0,
+    "chars_per_document": 704.0
   },
-  "timestamp_utc": "2025-08-24T17:20:28.255285Z",
+  "timestamp_utc": "2025-08-27T08:35:46.830432Z",
   "documents_processed": 1
 }

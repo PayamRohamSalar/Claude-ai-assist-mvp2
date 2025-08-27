@@ -11,29 +11,23 @@ PRAGMA foreign_keys = ON;
 
 -- Documents table: Main document metadata
 CREATE TABLE IF NOT EXISTS documents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_uid TEXT UNIQUE NOT NULL,
+    id INTEGER PRIMARY KEY,
+    document_uid TEXT NOT NULL UNIQUE,
     title TEXT,
     document_type TEXT,
-    section TEXT,
-    approval_authority TEXT,
     approval_date TEXT,
-    effective_date TEXT,
-    document_number TEXT,
-    subject TEXT,
-    keywords TEXT,
-    confidence_score REAL,
-    source_file TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-);
+    approval_authority TEXT,
+    section_name TEXT,
+    confidence_score REAL DEFAULT 0.0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) WITHOUT ROWID;
 
 -- Chapters table: Document chapters/sections
 CREATE TABLE IF NOT EXISTS chapters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id INTEGER NOT NULL,
-    chapter_index INTEGER,
     chapter_title TEXT,
+    chapter_index INTEGER,
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
 );
 
@@ -76,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_clauses_note_id ON clauses(note_id);
 
 -- Frequently queried columns
 CREATE INDEX IF NOT EXISTS idx_documents_document_type ON documents(document_type);
-CREATE INDEX IF NOT EXISTS idx_documents_section ON documents(section);
+CREATE INDEX IF NOT EXISTS idx_documents_section_name ON documents(section_name);
 CREATE INDEX IF NOT EXISTS idx_documents_approval_authority ON documents(approval_authority);
 CREATE INDEX IF NOT EXISTS idx_documents_document_uid ON documents(document_uid);
 CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at);
@@ -89,8 +83,9 @@ CREATE INDEX IF NOT EXISTS idx_articles_article_number ON articles(article_numbe
 -- Documents FTS table for full-text search
 CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
     title,
-    subject,
-    keywords,
+    document_type,
+    approval_authority,
+    section_name,
     content='documents',
     content_rowid='id',
     tokenize='unicode61 remove_diacritics 1 tokenchars ''ابپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی‌آأإٱٲٳٴٵٶٷٸٹٺٻټٽپژچکگڈڑںۂۃ'''
@@ -129,20 +124,20 @@ CREATE VIRTUAL TABLE IF NOT EXISTS clauses_fts USING fts5(
 
 -- Documents triggers
 CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
-    INSERT INTO documents_fts(rowid, title, subject, keywords) 
-    VALUES (new.id, new.title, new.subject, new.keywords);
+    INSERT INTO documents_fts(rowid, title, document_type, approval_authority, section_name) 
+    VALUES (new.id, new.title, new.document_type, new.approval_authority, new.section_name);
 END;
 
 CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
-    INSERT INTO documents_fts(documents_fts, rowid, title, subject, keywords) 
-    VALUES ('delete', old.id, old.title, old.subject, old.keywords);
+    INSERT INTO documents_fts(documents_fts, rowid, title, document_type, approval_authority, section_name) 
+    VALUES ('delete', old.id, old.title, old.document_type, old.approval_authority, old.section_name);
 END;
 
 CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
-    INSERT INTO documents_fts(documents_fts, rowid, title, subject, keywords) 
-    VALUES ('delete', old.id, old.title, old.subject, old.keywords);
-    INSERT INTO documents_fts(rowid, title, subject, keywords) 
-    VALUES (new.id, new.title, new.subject, new.keywords);
+    INSERT INTO documents_fts(documents_fts, rowid, title, document_type, approval_authority, section_name) 
+    VALUES ('delete', old.id, old.title, old.document_type, old.approval_authority, old.section_name);
+    INSERT INTO documents_fts(rowid, title, document_type, approval_authority, section_name) 
+    VALUES (new.id, new.title, new.document_type, new.approval_authority, new.section_name);
 END;
 
 -- Articles triggers

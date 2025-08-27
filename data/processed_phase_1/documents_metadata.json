@@ -1,17 +1,17 @@
 [
   {
-    "title": "Document from Part2_Legals.docx",
+    "title": "قانون حمایت از کودکان و نوجوانان",
     "document_type": "قانون",
-    "approval_authority": "مجلس شورای اسلامی",
-    "approval_date": "",
-    "section_name": "بخش دوم - قوانین",
-    "document_number": "",
-    "subject": "",
-    "confidence_score": 0.8,
-    "chars_clean": 30,
+    "approval_authority": null,
+    "approval_date": null,
+    "section_name": null,
+    "document_number": null,
+    "subject": null,
+    "confidence_score": 0.0,
+    "chars_clean": 704,
     "total_articles": 1,
-    "total_notes": 0,
-    "source_filename": "Part2_Legals.docx",
-    "timestamp_utc": "2025-08-24T17:20:28.248283Z"
+    "total_notes": 1,
+    "source_filename": "test_document.txt",
+    "timestamp_utc": "2025-08-27T08:35:46.816467Z"
   }
 ]
