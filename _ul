@@ -1,0 +1,571 @@
+2025-08-26 19:20:17,651 - faiss.loader - INFO - Loading faiss with AVX2 support.
+2025-08-26 19:20:17,684 - faiss.loader - INFO - Successfully loaded faiss with AVX2 support.
+test_02_embedding_generator_creates_embeddings (tests.test_phase_3.TestPhase3Pipeline.test_02_embedding_generator_creates_embeddings)
+Test embedding generator with mocked model for speed ... --- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 282, in test_01_chunker_creates_valid_chunks
+    chunks = chunker.create_chunks_from_database(
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 453, in create_chunks_from_database
+    logger.info("Starting document chunking process")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: 'Starting document chunking process'
+Arguments: ()
+2025-08-26 19:20:19,679 - phase_3_rag.chunker - INFO - Starting document chunking process
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 282, in test_01_chunker_creates_valid_chunks
+    chunks = chunker.create_chunks_from_database(
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 454, in create_chunks_from_database
+    logger.info("\u0634\u0631\u0648\u0639 \u0641\u0631\u0622\u06cc\u0646\u062f \u062a\u06a9\u0647\u200c\u0628\u0646\u062f\u06cc \u0627\u0633\u0646\u0627\u062f")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: '\u0634\u0631\u0648\u0639 \u0641\u0631\u0622\u06cc\u0646\u062f \u062a\u06a9\u0647\u200c\u0628\u0646\u062f\u06cc \u0627\u0633\u0646\u0627\u062f'
+Arguments: ()
+2025-08-26 19:20:19,692 - phase_3_rag.chunker - INFO - \u0634\u0631\u0648\u0639 \u0641\u0631\u0622\u06cc\u0646\u062f \u062a\u06a9\u0647\u200c\u0628\u0646\u062f\u06cc \u0627\u0633\u0646\u0627\u062f
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 282, in test_01_chunker_creates_valid_chunks
+    chunks = chunker.create_chunks_from_database(
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 457, in create_chunks_from_database
+    conn = get_database_connection(db_path)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 301, in get_database_connection
+    logger.info(f"Connecting to database: {db_path}")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: 'Connecting to database: C:\\Users\\Payam\\AppData\\Local\\Temp\\phase3_test_kf8mrmi6\\test_legal.db'
+Arguments: ()
+2025-08-26 19:20:19,695 - phase_3_rag.chunker - INFO - Connecting to database: C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\test_legal.db
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 282, in test_01_chunker_creates_valid_chunks
+    chunks = chunker.create_chunks_from_database(
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 461, in create_chunks_from_database
+    logger.info("Fetching document data from database...")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: 'Fetching document data from database...'
+Arguments: ()
+2025-08-26 19:20:19,701 - phase_3_rag.chunker - INFO - Fetching document data from database...
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 282, in test_01_chunker_creates_valid_chunks
+    chunks = chunker.create_chunks_from_database(
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 468, in create_chunks_from_database
+    logger.info(f"Processing {len(document_rows)} database rows")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: 'Processing 5 database rows'
+Arguments: ()
+2025-08-26 19:20:19,705 - phase_3_rag.chunker - INFO - Processing 5 database rows
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 282, in test_01_chunker_creates_valid_chunks
+    chunks = chunker.create_chunks_from_database(
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 486, in create_chunks_from_database
+    logger.info(f"Created {len(all_chunks)} chunks from {len(documents_processed)} documents")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: 'Created 5 chunks from 2 documents'
+Arguments: ()
+2025-08-26 19:20:19,709 - phase_3_rag.chunker - INFO - Created 5 chunks from 2 documents
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 282, in test_01_chunker_creates_valid_chunks
+    chunks = chunker.create_chunks_from_database(
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 487, in create_chunks_from_database
+    logger.info(f"{len(all_chunks)} \u062a\u06a9\u0647 \u0627\u0632 {len(documents_processed)} \u0633\u0646\u062f \u0627\u06cc\u062c\u0627\u062f \u0634\u062f")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: '5 \u062a\u06a9\u0647 \u0627\u0632 2 \u0633\u0646\u062f \u0627\u06cc\u062c\u0627\u062f \u0634\u062f'
+Arguments: ()
+2025-08-26 19:20:19,711 - phase_3_rag.chunker - INFO - 5 \u062a\u06a9\u0647 \u0627\u0632 2 \u0633\u0646\u062f \u0627\u06cc\u062c\u0627\u062f \u0634\u062f
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 324, in test_01_chunker_creates_valid_chunks
+    chunker.write_chunks_json(chunks, output_path=self.chunks_path)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 547, in write_chunks_json
+    logger.info(f"Writing {len(chunks)} chunks to {output_path}")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: 'Writing 5 chunks to C:\\Users\\Payam\\AppData\\Local\\Temp\\phase3_test_kf8mrmi6\\chunks.json'
+Arguments: ()
+2025-08-26 19:20:19,714 - phase_3_rag.chunker - INFO - Writing 5 chunks to C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\chunks.json
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 324, in test_01_chunker_creates_valid_chunks
+    chunker.write_chunks_json(chunks, output_path=self.chunks_path)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 548, in write_chunks_json
+    logger.info(f"\u0646\u0648\u0634\u062a\u0646 {len(chunks)} \u062a\u06a9\u0647 \u062f\u0631 \u0641\u0627\u06cc\u0644 {output_path}")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: '\u0646\u0648\u0634\u062a\u0646 5 \u062a\u06a9\u0647 \u062f\u0631 \u0641\u0627\u06cc\u0644 C:\\Users\\Payam\\AppData\\Local\\Temp\\phase3_test_kf8mrmi6\\chunks.json'
+Arguments: ()
+2025-08-26 19:20:19,719 - phase_3_rag.chunker - INFO - \u0646\u0648\u0634\u062a\u0646 5 \u062a\u06a9\u0647 \u062f\u0631 \u0641\u0627\u06cc\u0644 C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\chunks.json
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 324, in test_01_chunker_creates_valid_chunks
+    chunker.write_chunks_json(chunks, output_path=self.chunks_path)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 553, in write_chunks_json
+    logger.info("Chunks written successfully")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: 'Chunks written successfully'
+Arguments: ()
+2025-08-26 19:20:19,725 - phase_3_rag.chunker - INFO - Chunks written successfully
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\logging\__init__.py", line 1113, in emit
+    stream.write(msg + self.terminator)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-3: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 102, in __init__
+    self.runTests()
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\main.py", line 274, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\runner.py", line 217, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 678, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 623, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py", line 579, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\mock.py", line 1378, in patched
+    return func(*newargs, **newkeywargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 332, in test_02_embedding_generator_creates_embeddings
+    chunks = self.test_01_chunker_creates_valid_chunks()
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\tests\test_phase_3.py", line 324, in test_01_chunker_creates_valid_chunks
+    chunker.write_chunks_json(chunks, output_path=self.chunks_path)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\phase_3_rag\chunker.py", line 554, in write_chunks_json
+    logger.info("\u062a\u06a9\u0647\u200c\u0647\u0627 \u0628\u0627 \u0645\u0648\u0641\u0642\u06cc\u062a \u0646\u0648\u0634\u062a\u0647 \u0634\u062f\u0646\u062f")
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 179, in info
+    self._log(logging.INFO, message, persian_msg, **kwargs)
+  File "D:\OneDrive\AI-Project\Claude-ai-assist-mvp2\shared_utils\logger.py", line 198, in _log
+    self.logger.log(level, message, extra=extra)
+Message: '\u062a\u06a9\u0647\u200c\u0647\u0627 \u0628\u0627 \u0645\u0648\u0641\u0642\u06cc\u062a \u0646\u0648\u0634\u062a\u0647 \u0634\u062f\u0646\u062f'
+Arguments: ()
+2025-08-26 19:20:19,730 - phase_3_rag.chunker - INFO - \u062a\u06a9\u0647\u200c\u0647\u0627 \u0628\u0627 \u0645\u0648\u0641\u0642\u06cc\u062a \u0646\u0648\u0634\u062a\u0647 \u0634\u062f\u0646\u062f
+2025-08-26 19:20:19,736 - phase_3_rag.embedding_generator - INFO - \u0634\u0631\u0648\u0639 \u0641\u0631\u0622\u06cc\u0646\u062f \u062a\u0648\u0644\u06cc\u062f \u0628\u0631\u062f\u0627\u0631\u0647\u0627...
+2025-08-26 19:20:19,736 - phase_3_rag.embedding_generator - INFO - Starting embedding generation process...
+2025-08-26 19:20:19,737 - phase_3_rag.embedding_generator - INFO - \u062f\u0631 \u062d\u0627\u0644 \u0628\u0627\u0631\u06af\u0630\u0627\u0631\u06cc \u0645\u062f\u0644: test-model
+2025-08-26 19:20:19,737 - phase_3_rag.embedding_generator - INFO - Loading model: test-model
+2025-08-26 19:20:19,737 - phase_3_rag.embedding_generator - INFO - \u0645\u062f\u0644 \u0627\u0632 Hugging Face Hub \u0628\u0627\u0631\u06af\u0630\u0627\u0631\u06cc \u0634\u062f: test-model
+2025-08-26 19:20:19,737 - phase_3_rag.embedding_generator - INFO - Model loaded from Hugging Face Hub: test-model
+2025-08-26 19:20:19,737 - phase_3_rag.embedding_generator - INFO - \u062f\u0631 \u062d\u0627\u0644 \u0628\u0627\u0631\u06af\u0630\u0627\u0631\u06cc \u0642\u0637\u0639\u0627\u062a \u0627\u0632: C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\chunks.json
+2025-08-26 19:20:19,738 - phase_3_rag.embedding_generator - INFO - Loading chunks from: C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\chunks.json
+2025-08-26 19:20:19,740 - phase_3_rag.embedding_generator - INFO - \u062a\u0639\u062f\u0627\u062f 5 \u0642\u0637\u0639\u0647 \u0628\u0627\u0631\u06af\u0630\u0627\u0631\u06cc \u0634\u062f
+2025-08-26 19:20:19,740 - phase_3_rag.embedding_generator - INFO - Loaded 5 chunks
+2025-08-26 19:20:19,740 - phase_3_rag.embedding_generator - INFO - \u062f\u0631 \u062d\u0627\u0644 \u062a\u0648\u0644\u06cc\u062f \u0628\u0631\u062f\u0627\u0631\u0647\u0627\u06cc 384 \u0628\u0639\u062f\u06cc \u0628\u0631\u0627\u06cc 5 \u0642\u0637\u0639\u0647...
+2025-08-26 19:20:19,740 - phase_3_rag.embedding_generator - INFO - Generating 384-dimensional embeddings for 5 chunks...
+2025-08-26 19:20:19,742 - phase_3_rag.embedding_generator - INFO - \u062a\u0648\u0644\u06cc\u062f \u0628\u0631\u062f\u0627\u0631\u0647\u0627 \u0628\u0627 \u0645\u0648\u0641\u0642\u06cc\u062a \u0627\u0646\u062c\u0627\u0645 \u0634\u062f: (5, 384)
+2025-08-26 19:20:19,742 - phase_3_rag.embedding_generator - INFO - Embeddings generated successfully: (5, 384)
+2025-08-26 19:20:19,742 - phase_3_rag.embedding_generator - INFO - \u062f\u0631 \u062d\u0627\u0644 \u0630\u062e\u06cc\u0631\u0647 \u0628\u0631\u062f\u0627\u0631\u0647\u0627 \u062f\u0631: C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\embeddings.npy
+2025-08-26 19:20:19,743 - phase_3_rag.embedding_generator - INFO - Saving embeddings to: C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\embeddings.npy
+2025-08-26 19:20:19,744 - phase_3_rag.embedding_generator - INFO - \u062f\u0631 \u062d\u0627\u0644 \u0630\u062e\u06cc\u0631\u0647 \u0645\u062a\u0627\u062f\u06cc\u062a\u0627 \u062f\u0631: C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\embeddings_meta.json
+2025-08-26 19:20:19,744 - phase_3_rag.embedding_generator - INFO - Saving metadata to: C:\Users\Payam\AppData\Local\Temp\phase3_test_kf8mrmi6\embeddings_meta.json
+2025-08-26 19:20:19,745 - phase_3_rag.embedding_generator - INFO - \u062e\u0644\u0627\u0635\u0647 \u0646\u062a\u0627\u06cc\u062c:
+2025-08-26 19:20:19,745 - phase_3_rag.embedding_generator - INFO - Summary:
+2025-08-26 19:20:19,746 - phase_3_rag.embedding_generator - INFO -   \u062a\u0639\u062f\u0627\u062f \u0628\u0631\u062f\u0627\u0631\u0647\u0627: 5
+2025-08-26 19:20:19,746 - phase_3_rag.embedding_generator - INFO -   Number of embeddings: 5
+2025-08-26 19:20:19,746 - phase_3_rag.embedding_generator - INFO -   \u0627\u0628\u0639\u0627\u062f: 384
+2025-08-26 19:20:19,746 - phase_3_rag.embedding_generator - INFO -   Dimensions: 384
+2025-08-26 19:20:19,746 - phase_3_rag.embedding_generator - INFO -   \u0645\u062f\u0644: test-model
+2025-08-26 19:20:19,746 - phase_3_rag.embedding_generator - INFO -   Model: test-model
+2025-08-26 19:20:19,747 - phase_3_rag.embedding_generator - INFO -   \u0646\u0648\u0639 \u062f\u0627\u062f\u0647: float32
+2025-08-26 19:20:19,747 - phase_3_rag.embedding_generator - INFO -   Data type: float32
+2025-08-26 19:20:19,747 - phase_3_rag.embedding_generator - INFO -   \u062d\u062c\u0645 \u0641\u0627\u06cc\u0644: 0.01 MB
+2025-08-26 19:20:19,747 - phase_3_rag.embedding_generator - INFO -   File size: 0.01 MB
+C:\Users\Payam\miniconda3\envs\claude-ai\Lib\unittest\case.py:678: DeprecationWarning: It is deprecated to return a value that is not None from a test case (<bound method TestPhase3Pipeline.test_02_embedding_generator_creates_embeddings of <tests.test_phase_3.TestPhase3Pipeline testMethod=test_02_embedding_generator_creates_embeddings>>)
+  return self.run(*args, **kwds)
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.803s
+
+OK

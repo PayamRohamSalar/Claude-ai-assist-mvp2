@@ -228,7 +228,7 @@ class VectorStoreBuilder:
         
         # Save index and mapping atomically
         faiss_dir = self.vector_db_dir / "faiss"
-        faiss_dir.mkdir(exist_ok=True)
+        faiss_dir.mkdir(parents=True, exist_ok=True)
         
         index_path = faiss_dir / "faiss.index"
         mapping_path = faiss_dir / "mapping.json"
