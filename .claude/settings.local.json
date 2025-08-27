@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(move:*)",
+      "Bash(python -m pytest tests/test_rag_engine.py -v)",
+      "Bash(python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

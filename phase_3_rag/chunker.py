@@ -393,7 +393,7 @@ def fetch_document_data(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
         d.document_uid,
         d.title as document_title,
         d.document_type,
-        d.section,
+        d.section_name AS section,
         d.approval_date,
         d.approval_authority,
         c.chapter_title,
