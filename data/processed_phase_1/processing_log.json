@@ -1,0 +1,28 @@
+{
+  "pipeline_info": {
+    "version": "1.0.0",
+    "timestamp_utc": "2025-08-24T17:20:28.258284Z",
+    "input_directory": "D:\\OneDrive\\AI-Project\\Claude-ai-assist-mvp2\\data\\raw",
+    "output_directory": "D:\\OneDrive\\AI-Project\\Claude-ai-assist-mvp2\\data\\processed_phase_1"
+  },
+  "processing_results": [
+    {
+      "source_file": "Part2_Legals.docx",
+      "split_index": 0,
+      "success": true,
+      "duration_ms": 8.999347686767578,
+      "error_message": null,
+      "document_path": "D:\\OneDrive\\AI-Project\\Claude-ai-assist-mvp2\\data\\processed_phase_1\\Document_from_Part2_Legals.docx__001.json",
+      "metadata_title": "Document from Part2_Legals.docx",
+      "articles_count": 1,
+      "notes_count": 0,
+      "chars_clean": 30
+    }
+  ],
+  "summary": {
+    "total_files_processed": 1,
+    "total_splits_processed": 1,
+    "successful_splits": 1,
+    "failed_splits": 0
+  }
+}

@@ -1,0 +1,275 @@
+{
+  "chunking": {
+    "limits": {
+      "max_chunk_chars": 1200,
+      "min_chunk_chars": 150,
+      "max_chunk_tokens": 300,
+      "min_chunk_tokens": 40,
+      "preferred_chunk_chars": 800,
+      "preferred_chunk_tokens": 200
+    },
+    "overlap": {
+      "char_overlap": 100,
+      "token_overlap": 25,
+      "overlap_ratio": 0.12,
+      "dynamic_overlap": true,
+      "overlap_strategy": "semantic_boundary"
+    },
+    "split_priorities": {
+      "priority_levels": [
+        {
+          "level": 1,
+          "description": "Legal document boundaries",
+          "patterns": [
+            "^\\s*قانون\\s+",
+            "^\\s*آیین\\s*نامه\\s+",
+            "^\\s*مقررات\\s+"
+          ],
+          "min_distance": 200,
+          "preserve_header": true
+        },
+        {
+          "level": 2,
+          "description": "Chapter boundaries",
+          "patterns": [
+            "^\\s*فصل\\s+[\\u06F0-\\u06F90-9۰-۹]+",
+            "^\\s*بخش\\s+[\\u06F0-\\u06F90-9۰-۹]+",
+            "^\\s*قسمت\\s+[\\u06F0-\\u06F90-9۰-۹]+"
+          ],
+          "min_distance": 150,
+          "preserve_header": true
+        },
+        {
+          "level": 3,
+          "description": "Article boundaries (preferred split points)",
+          "patterns": [
+            "^\\s*ماده\\s+[\\u06F0-\\u06F90-9۰-۹]+",
+            "^\\s*ماده\\s+واحده"
+          ],
+          "min_distance": 100,
+          "preserve_header": true,
+          "preferred": true
+        },
+        {
+          "level": 4,
+          "description": "Note boundaries",
+          "patterns": [
+            "^\\s*تبصره\\s+[\\u06F0-\\u06F90-9۰-۹]+",
+            "^\\s*تبصره\\s*[.:]",
+            "^\\s*تبصره\\s*-"
+          ],
+          "min_distance": 50,
+          "preserve_header": true
+        },
+        {
+          "level": 5,
+          "description": "Clause boundaries",
+          "patterns": [
+            "^\\s*بند\\s+[الف-ی]",
+            "^\\s*[الف-ی]\\s*[.):]",
+            "^\\s*[0-9۰-۹\\u06F0-\\u06F9]+\\s*[.):]"
+          ],
+          "min_distance": 30,
+          "preserve_header": true
+        },
+        {
+          "level": 6,
+          "description": "Sentence boundaries",
+          "patterns": [
+            "[.؟!…]\\s+",
+            "[؛،]\\s+(?=[A-Za-z\\u0600-\\u06FF])"
+          ],
+          "min_distance": 10,
+          "preserve_header": false
+        }
+      ]
+    },
+    "exclusions": {
+      "no_split_patterns": [
+        {
+          "name": "numbered_articles",
+          "pattern": "ماده\\s+[\\u06F0-\\u06F90-9۰-۹]+[^.]*?(?=ماده\\s+|تبصره\\s+|بند\\s+|$)",
+          "description": "Complete numbered articles",
+          "case_sensitive": false
+        },
+        {
+          "name": "numbered_notes",
+          "pattern": "تبصره\\s+[\\u06F0-\\u06F90-9۰-۹]+[^.]*?(?=تبصره\\s+|ماده\\s+|بند\\s+|$)",
+          "description": "Complete numbered notes",
+          "case_sensitive": false
+        },
+        {
+          "name": "numbered_clauses",
+          "pattern": "بند\\s+[الف-ی][^.]*?(?=بند\\s+|تبصره\\s+|ماده\\s+|$)",
+          "description": "Complete numbered clauses",
+          "case_sensitive": false
+        },
+        {
+          "name": "legal_references",
+          "pattern": "(?:قانون|آیین\\s*نامه|مقررات)\\s+[^.]{10,100}\\s+مصوب\\s+[\\d/\\u06F0-\\u06F9۰-۹]+",
+          "description": "Legal document references with dates",
+          "case_sensitive": false
+        },
+        {
+          "name": "date_references",
+          "pattern": "\\d{1,2}/\\d{1,2}/\\d{4}|[\\u06F0-\\u06F9۰-۹]{1,2}/[\\u06F0-\\u06F9۰-۹]{1,2}/[\\u06F0-\\u06F9۰-۹]{4}",
+          "description": "Persian and Gregorian dates",
+          "case_sensitive": false
+        },
+        {
+          "name": "enumerated_lists",
+          "pattern": "(?:[0-9\\u06F0-\\u06F9۰-۹]+[.):]|[الف-ی][.):])\\s*[^.]{5,}",
+          "description": "Numbered or lettered list items",
+          "case_sensitive": false
+        }
+      ],
+      "preserve_together": [
+        {
+          "name": "article_header_with_content",
+          "start_pattern": "^\\s*ماده\\s+",
+          "end_pattern": "(?=\\s*(?:ماده\\s+|تبصره\\s+|فصل\\s+|$))",
+          "max_chars": 2000,
+          "description": "Keep article headers with their immediate content"
+        },
+        {
+          "name": "note_with_content",
+          "start_pattern": "^\\s*تبصره\\s+",
+          "end_pattern": "(?=\\s*(?:تبصره\\s+|ماده\\s+|بند\\s+|فصل\\s+|$))",
+          "max_chars": 1500,
+          "description": "Keep note headers with their content"
+        },
+        {
+          "name": "clause_with_content",
+          "start_pattern": "^\\s*بند\\s+",
+          "end_pattern": "(?=\\s*(?:بند\\s+|تبصره\\s+|ماده\\s+|$))",
+          "max_chars": 800,
+          "description": "Keep clause headers with their content"
+        }
+      ]
+    },
+    "text_processing": {
+      "normalization": {
+        "normalize_persian_digits": true,
+        "normalize_arabic_chars": true,
+        "normalize_whitespace": true,
+        "remove_extra_newlines": true,
+        "preserve_legal_formatting": true,
+        "character_mappings": {
+          "ي": "ی",
+          "ك": "ک",
+          "٠": "۰",
+          "١": "۱",
+          "٢": "۲",
+          "٣": "۳",
+          "٤": "۴",
+          "٥": "۵",
+          "٦": "۶",
+          "٧": "۷",
+          "٨": "۸",
+          "٩": "۹"
+        }
+      },
+      "sentence_boundaries": {
+        "primary_terminators": [".", "؟", "!", "…"],
+        "secondary_terminators": ["؛", "،"],
+        "context_aware": true,
+        "min_sentence_length": 10,
+        "abbreviation_exceptions": [
+          "ج.ا.ا",
+          "ق.م",
+          "ا.ق",
+          "م.ا",
+          "وزارت ف.آ.ع"
+        ]
+      }
+    },
+    "quality_control": {
+      "validation": {
+        "check_legal_structure_integrity": true,
+        "ensure_complete_articles": true,
+        "validate_references": true,
+        "check_numbering_sequence": true
+      },
+      "metrics": {
+        "target_chunk_density": 0.8,
+        "max_overlap_ratio": 0.15,
+        "min_content_ratio": 0.7,
+        "preferred_split_score_threshold": 0.6
+      },
+      "fallback_strategies": [
+        {
+          "condition": "chunk_too_large",
+          "action": "split_at_sentence_boundary",
+          "preserve_minimum": true
+        },
+        {
+          "condition": "no_good_split_point",
+          "action": "split_at_character_limit",
+          "add_continuation_marker": true
+        },
+        {
+          "condition": "chunk_too_small",
+          "action": "merge_with_adjacent",
+          "respect_boundaries": true
+        }
+      ]
+    },
+    "output": {
+      "format": {
+        "include_metadata": true,
+        "include_source_info": true,
+        "include_split_rationale": true,
+        "preserve_original_formatting": true
+      },
+      "chunk_metadata": [
+        "legal_structure_type",
+        "article_number",
+        "note_number", 
+        "clause_identifier",
+        "split_method",
+        "overlap_info",
+        "quality_score"
+      ]
+    }
+  },
+  "legal_document_types": {
+    "قانون": {
+      "typical_structure": ["فصل", "ماده", "تبصره", "بند"],
+      "preferred_chunk_size": "article_level",
+      "special_handling": true
+    },
+    "آیین‌نامه": {
+      "typical_structure": ["بخش", "ماده", "تبصره"],
+      "preferred_chunk_size": "article_level",
+      "special_handling": true
+    },
+    "مقررات": {
+      "typical_structure": ["قسمت", "ماده", "بند"],
+      "preferred_chunk_size": "article_level",
+      "special_handling": true
+    },
+    "دستورالعمل": {
+      "typical_structure": ["بخش", "ماده"],
+      "preferred_chunk_size": "flexible",
+      "special_handling": false
+    }
+  },
+  "performance": {
+    "caching": {
+      "cache_split_decisions": true,
+      "cache_pattern_matches": true,
+      "cache_size_mb": 50
+    },
+    "optimization": {
+      "parallel_processing": false,
+      "batch_size": 100,
+      "memory_limit_mb": 500
+    }
+  },
+  "logging": {
+    "log_split_decisions": true,
+    "log_exclusion_matches": true,
+    "log_quality_metrics": true,
+    "debug_mode": false
+  }
+}

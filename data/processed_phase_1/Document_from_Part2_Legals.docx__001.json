@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "title": "Document from Part2_Legals.docx",
+    "document_type": "قانون",
+    "approval_authority": "مجلس شورای اسلامی",
+    "approval_date": "",
+    "effective_date": "",
+    "section_name": "بخش دوم - قوانین",
+    "document_number": "",
+    "subject": "",
+    "keywords": [],
+    "related_docs": [],
+    "confidence_score": 0.8
+  },
+  "content_variants": {
+    "normalized": "Content from Part2_Legals.docx",
+    "ascii_digits": "Content from Part2_Legals.docx",
+    "persian_digits": "Content from Part2_Legals.docx"
+  },
+  "structure": {
+    "chapters": [
+      {
+        "title": "فصل واحد",
+        "articles": [
+          {
+            "number": "1",
+            "text": "Content from Part2_Legals.docx",
+            "notes": [],
+            "clauses": []
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "chapters": 1,
+      "articles": 1,
+      "notes": 0
+    }
+  },
+  "stats": {
+    "chars_original": 30,
+    "chars_clean": 30
+  },
+  "processing": {
+    "source_filename": "Part2_Legals.docx",
+    "timestamp_utc": "2025-08-24T17:20:28.248283Z",
+    "duration_ms": 4.001140594482422,
+    "pipeline_versions": {
+      "legal_structure_parser": "1.0.0",
+      "json_formatter": "1.0.0",
+      "main_processor": "1.0.0"
+    }
+  }
+}

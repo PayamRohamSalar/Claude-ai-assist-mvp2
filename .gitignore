@@ -85,8 +85,8 @@ logs/
 *.log.*
 
 # Data files (sensitive content)
-data/raw/*
-data/processed_*/*
+#data/raw/*
+#data/processed_*/*
 !data/raw/README.md
 !data/*/README.md
 

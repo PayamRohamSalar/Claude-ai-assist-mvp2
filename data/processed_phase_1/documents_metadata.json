@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Document from Part2_Legals.docx",
+    "document_type": "قانون",
+    "approval_authority": "مجلس شورای اسلامی",
+    "approval_date": "",
+    "section_name": "بخش دوم - قوانین",
+    "document_number": "",
+    "subject": "",
+    "confidence_score": 0.8,
+    "chars_clean": 30,
+    "total_articles": 1,
+    "total_notes": 0,
+    "source_filename": "Part2_Legals.docx",
+    "timestamp_utc": "2025-08-24T17:20:28.248283Z"
+  }
+]
