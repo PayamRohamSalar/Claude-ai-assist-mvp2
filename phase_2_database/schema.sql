@@ -216,7 +216,7 @@ SELECT
     d.document_uid,
     d.title as document_title,
     d.document_type,
-    d.section,
+    d.section_name,
     c.id as chapter_id,
     c.chapter_index,
     c.chapter_title,

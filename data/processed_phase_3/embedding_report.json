@@ -1,0 +1,131 @@
+{
+  "vector_dimension": 384,
+  "vector_count": 152,
+  "l2_norms": {
+    "mean": 3.022730827331543,
+    "variance": 0.2424064427614212,
+    "std": 0.4923478960990906,
+    "min": 2.1560256481170654,
+    "max": 5.814223766326904
+  },
+  "duplicate_candidates": [
+    {
+      "chunk_uid_1": "3e5083a1445140dead716cd9e8c80eb43205425a",
+      "chunk_uid_2": "0c1cadf93601752e26918076490c216e1a09803a",
+      "cosine_similarity": 1.0000001192092896,
+      "embedding_indices": [
+        45,
+        37
+      ]
+    },
+    {
+      "chunk_uid_1": "dba3a726c30adec2451795e21640e4499a77df01",
+      "chunk_uid_2": "19b95eaedb778b4a75b29ad2d8085ffd4cdfaca5",
+      "cosine_similarity": 1.0,
+      "embedding_indices": [
+        46,
+        38
+      ]
+    },
+    {
+      "chunk_uid_1": "5f0a6f865977d9bc593a4ac56b5ca82af0026e24",
+      "chunk_uid_2": "4fbc44393507eeb1ce4ce21f7b3dc0bf8573fe1e",
+      "cosine_similarity": 0.999681830406189,
+      "embedding_indices": [
+        40,
+        48
+      ]
+    },
+    {
+      "chunk_uid_1": "e6108a2c2c65756f77f5d9b8f3c69d5e7cd8b5b7",
+      "chunk_uid_2": "8ea73802a89c9fb8e05eb07125ef5d528c631793",
+      "cosine_similarity": 0.9913657903671265,
+      "embedding_indices": [
+        47,
+        39
+      ]
+    },
+    {
+      "chunk_uid_1": "1911a6da2343bcafc2b849c71563d1fa69ce4af4",
+      "chunk_uid_2": "11f28d55baba1eb1fbe1d257aaf5ed6feb52040c",
+      "cosine_similarity": 0.9906951785087585,
+      "embedding_indices": [
+        50,
+        17
+      ]
+    },
+    {
+      "chunk_uid_1": "71ae0c4b5b101283db2aae96fb63ab2f08103bd9",
+      "chunk_uid_2": "18ced15d0b77a88e81b421f096aae025ab1ece76",
+      "cosine_similarity": 0.9900960922241211,
+      "embedding_indices": [
+        79,
+        29
+      ]
+    },
+    {
+      "chunk_uid_1": "77bed3d12d287d5c8920e8fac99c03749c5a16e6",
+      "chunk_uid_2": "efcc54842df203e695935d6bbe7e1e6772fc88a7",
+      "cosine_similarity": 0.9856587052345276,
+      "embedding_indices": [
+        108,
+        106
+      ]
+    },
+    {
+      "chunk_uid_1": "1ae4e5ccec192d436646cccc7059ffa0b8c0313d",
+      "chunk_uid_2": "afde46476c24f8a3e4b4d5976f1d11fc3047e593",
+      "cosine_similarity": 0.9831196069717407,
+      "embedding_indices": [
+        21,
+        130
+      ]
+    },
+    {
+      "chunk_uid_1": "f098d637812cb2fd4f52c560c8f875f6be12b466",
+      "chunk_uid_2": "efcc54842df203e695935d6bbe7e1e6772fc88a7",
+      "cosine_similarity": 0.981604278087616,
+      "embedding_indices": [
+        26,
+        106
+      ]
+    },
+    {
+      "chunk_uid_1": "0fa069b3b4e397afc73f5f7f0be52a89996abfe9",
+      "chunk_uid_2": "0bc42d339865d090d3ad41844d3135b692c21078",
+      "cosine_similarity": 0.9806841611862183,
+      "embedding_indices": [
+        86,
+        2
+      ]
+    }
+  ],
+  "chunk_length_distribution": {
+    "mean_length": 501.54605263157896,
+    "median_length": 388.5,
+    "std_length": 341.81021278388636,
+    "min_length": 30,
+    "max_length": 1126,
+    "percentiles": {
+      "25th": 173.75,
+      "50th": 388.5,
+      "75th": 872.5,
+      "90th": 965.9000000000001,
+      "95th": 997.0
+    },
+    "total_chunks": 152,
+    "empty_chunks": 0
+  },
+  "embedding_stats": {
+    "mean_magnitude": 3.022730827331543,
+    "embedding_density": 0.12253985553979874,
+    "zero_vectors": 0,
+    "model_name": "paraphrase-multilingual-MiniLM-L12-v2"
+  },
+  "analysis_metadata": {
+    "analysis_time_utc": "2025-08-27T11:17:14.828394+00:00",
+    "random_seed": 42,
+    "chunks_md5": "484311146e57be289a28157f2da72b10",
+    "embedding_creation_time": "2025-08-27T11:06:01.633384+00:00"
+  }
+}

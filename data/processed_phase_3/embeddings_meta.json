@@ -1,10 +1,10 @@
 {
-  "model_name": "paraphrase-multilingual-MiniLM-L12-v2",
+  "model_name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
   "dimension": 384,
   "count": 152,
   "chunks_md5": "484311146e57be289a28157f2da72b10",
   "dtype": "float32",
-  "created_utc": "2025-08-27T09:38:43.294823+00:00",
+  "created_utc": "2025-08-27T11:07:18.262385+00:00",
   "chunk_uid_order": [
     "5994840482107692414bacdca0dc490753de943e",
     "dac3835ee5e8c22e507543ad83eeaa4e16318186",

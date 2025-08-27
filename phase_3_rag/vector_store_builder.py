@@ -15,6 +15,7 @@ import logging
 import os
 import shutil
 import time
+import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union
@@ -52,19 +53,25 @@ class VectorStoreBuilder:
     Vector Store Builder Class
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], embeddings_path: Optional[str] = None, meta_path: Optional[str] = None, 
+                 chunks_path: Optional[str] = None, vector_db_dir: Optional[str] = None, backend: Optional[str] = None):
         """
         راه‌اندازی سازنده فروشگاه بردار
         Initialize the vector store builder
         
         Args:
             config: Dictionary containing configuration parameters
+            embeddings_path: Optional path to embeddings file
+            meta_path: Optional path to metadata file
+            chunks_path: Optional path to chunks file
+            vector_db_dir: Optional path to vector database directory
+            backend: Optional backend override (faiss or chroma)
         """
         self.config = config
         self.rag_config = config.get('rag', {})
         
         # Backend configuration
-        self.backend = self.rag_config.get('index_backend', 'faiss').lower()
+        self.backend = backend if backend else self.rag_config.get('index_backend', 'faiss').lower()
         
         if self.backend not in ['faiss', 'chroma']:
             raise ValueError(
@@ -90,10 +97,10 @@ class VectorStoreBuilder:
             )
         
         # Paths
-        self.embeddings_path = Path("data/processed_phase_3/embeddings.npy")
-        self.meta_path = Path("data/processed_phase_3/embeddings_meta.json")
-        self.chunks_path = Path("data/processed_phase_3/chunks.json")
-        self.vector_db_dir = Path("data/processed_phase_3/vector_db")
+        self.embeddings_path = Path(embeddings_path if embeddings_path else "data/processed_phase_3/embeddings.npy")
+        self.meta_path = Path(meta_path if meta_path else "data/processed_phase_3/embeddings_meta.json")
+        self.chunks_path = Path(chunks_path if chunks_path else "data/processed_phase_3/chunks.json")
+        self.vector_db_dir = Path(vector_db_dir if vector_db_dir else "data/processed_phase_3/vector_db")
         
         # Ensure output directory exists
         self.vector_db_dir.mkdir(parents=True, exist_ok=True)
@@ -500,14 +507,57 @@ def load_config() -> Dict[str, Any]:
     }
 
 
+def parse_args():
+    """
+    تجزیه آرگومان‌های خط فرمان
+    Parse command line arguments
+    
+    Returns:
+        argparse.Namespace: Parsed arguments
+    """
+    parser = argparse.ArgumentParser(description="Vector Store Builder for RAG System")
+    
+    parser.add_argument("--embeddings-file", type=str, default="data/processed_phase_3/embeddings.npy",
+                        help="Path to embeddings file (default: data/processed_phase_3/embeddings.npy)")
+    
+    parser.add_argument("--metadata-file", type=str, default="data/processed_phase_3/embeddings_meta.json",
+                        help="Path to embeddings metadata file (default: data/processed_phase_3/embeddings_meta.json)")
+    
+    parser.add_argument("--chunks-file", type=str, default="data/processed_phase_3/chunks.json",
+                        help="Path to chunks file (default: data/processed_phase_3/chunks.json)")
+    
+    parser.add_argument("--output-dir", type=str, default="data/processed_phase_3/vector_db",
+                        help="Output directory for vector database (default: data/processed_phase_3/vector_db)")
+    
+    parser.add_argument("--backend", type=str, choices=["faiss", "chroma"], default="faiss",
+                        help="Vector store backend (default: faiss)")
+    
+    return parser.parse_args()
+
+
 def main():
     """
     تابع اصلی برای اجرای مستقل
     Main function for standalone execution
     """
     try:
+        # Parse command line arguments
+        args = parse_args()
+        
+        # Load configuration
         config = load_config()
-        builder = VectorStoreBuilder(config)
+        
+        # Create builder with CLI overrides
+        builder = VectorStoreBuilder(
+            config=config,
+            embeddings_path=args.embeddings_file,
+            meta_path=args.metadata_file,
+            chunks_path=args.chunks_file,
+            vector_db_dir=args.output_dir,
+            backend=args.backend
+        )
+        
+        # Run the builder
         builder.run()
         
     except Exception as e:

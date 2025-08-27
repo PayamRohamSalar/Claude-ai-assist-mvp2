@@ -7,10 +7,12 @@ RAG Quality Evaluation System
 This module performs embedding quality assessment and retrieval performance evaluation
 """
 
+import argparse
 import json
 import logging
 import os
 import random
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,13 +58,20 @@ class QualityEvaluator:
     RAG System Quality Evaluator Class
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], vector_db_dir: Optional[str] = None,
+                 chunks_file: Optional[str] = None, embeddings_file: Optional[str] = None,
+                 metadata_file: Optional[str] = None, output_dir: Optional[str] = None):
         """
         راه‌اندازی ارزیاب کیفیت
         Initialize quality evaluator
         
         Args:
             config: Dictionary containing configuration parameters
+            vector_db_dir: Override path to vector database directory
+            chunks_file: Override path to chunks.json file
+            embeddings_file: Override path to embeddings.npy file
+            metadata_file: Override path to embeddings_meta.json file
+            output_dir: Override output directory for reports
         """
         self.config = config
         self.rag_config = config.get('rag', {})
@@ -78,14 +87,15 @@ class QualityEvaluator:
         # Model configuration
         self.model_name = self.rag_config.get('embedding_model', 'paraphrase-multilingual-MiniLM-L12-v2')
         
-        # Paths
-        self.embeddings_path = Path("data/processed_phase_3/embeddings.npy")
-        self.meta_path = Path("data/processed_phase_3/embeddings_meta.json")
-        self.chunks_path = Path("data/processed_phase_3/chunks.json")
-        self.vector_db_dir = Path("data/processed_phase_3/vector_db")
+        # Paths with CLI overrides
+        self.embeddings_path = Path(embeddings_file or "data/processed_phase_3/embeddings.npy")
+        self.meta_path = Path(metadata_file or "data/processed_phase_3/embeddings_meta.json")
+        self.chunks_path = Path(chunks_file or "data/processed_phase_3/chunks.json")
+        self.vector_db_dir = Path(vector_db_dir or "data/processed_phase_3/vector_db")
         
-        # Output paths
-        self.output_dir = Path(".")
+        # Output paths with CLI overrides
+        self.output_dir = Path(output_dir or "data/processed_phase_3")
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.embedding_report_path = self.output_dir / "embedding_report.json"
         self.retrieval_report_path = self.output_dir / "retrieval_sanity.json"
         
@@ -716,28 +726,100 @@ class QualityEvaluator:
         self.run_quality_evaluation()
 
 
-def load_config() -> Dict[str, Any]:
+def create_cli_parser() -> argparse.ArgumentParser:
+    """
+    Create command line argument parser for quality evaluation.
+    
+    Returns:
+        argparse.ArgumentParser: Configured argument parser
+    """
+    parser = argparse.ArgumentParser(
+        description="Evaluate RAG system quality - embeddings and retrieval performance",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage examples:
+  python quality_eval.py
+  python quality_eval.py --output-dir reports/
+  python quality_eval.py --vector-db-dir vector_db/ --chunks-file chunks.json
+  python quality_eval.py --embeddings-file embeddings.npy --metadata-file meta.json
+        """
+    )
+    
+    parser.add_argument(
+        '--vector-db-dir',
+        default='data/processed_phase_3/vector_db',
+        help='Path to vector database directory (default: data/processed_phase_3/vector_db)'
+    )
+    
+    parser.add_argument(
+        '--chunks-file',
+        default='data/processed_phase_3/chunks.json',
+        help='Path to chunks.json file (default: data/processed_phase_3/chunks.json)'
+    )
+    
+    parser.add_argument(
+        '--embeddings-file',
+        default='data/processed_phase_3/embeddings.npy',
+        help='Path to embeddings.npy file (default: data/processed_phase_3/embeddings.npy)'
+    )
+    
+    parser.add_argument(
+        '--metadata-file',
+        default='data/processed_phase_3/embeddings_meta.json',
+        help='Path to embeddings_meta.json file (default: data/processed_phase_3/embeddings_meta.json)'
+    )
+    
+    parser.add_argument(
+        '--output-dir',
+        default='data/processed_phase_3',
+        help='Output directory for reports (default: data/processed_phase_3)'
+    )
+    
+    parser.add_argument(
+        '--config',
+        default='config/config.json',
+        help='Configuration file path (default: config/config.json)'
+    )
+    
+    return parser
+
+
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """
     بارگذاری تنظیمات از فایل کانفیگ
     Load configuration from config file
+    
+    Args:
+        config_path: Specific config file path to load
     """
-    config_paths = [
+    config_paths = []
+    
+    # If specific path provided, try it first
+    if config_path and os.path.exists(config_path):
+        config_paths.append(config_path)
+    
+    # Fallback paths
+    config_paths.extend([
+        "config/config.json",
         "config.json",
         "data/config.json", 
         "phase_3_rag/config.json"
-    ]
+    ])
     
-    for config_path in config_paths:
-        if os.path.exists(config_path):
+    for path in config_paths:
+        if os.path.exists(path):
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                logger.info(f"Loading config from: {path}")
+                with open(path, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
-                logger.warning(f"خطا در بارگذاری کانفیگ از {config_path}: {e}")
+                logger.warning(f"خطا در بارگذاری کانفیگ از {path}: {e}")
+                logger.warning(f"Error loading config from {path}: {e}")
                 continue
     
     # Default configuration
     logger.info("از تنظیمات پیش‌فرض استفاده می‌شود")
+    logger.info("Using default configuration")
     
     return {
         "rag": {
@@ -754,13 +836,53 @@ def main():
     Main function for standalone execution
     """
     try:
-        config = load_config()
-        evaluator = QualityEvaluator(config)
+        # Parse command line arguments
+        parser = create_cli_parser()
+        args = parser.parse_args()
+        
+        # Load configuration
+        config = load_config(args.config)
+        
+        # Log CLI overrides if provided
+        if args.vector_db_dir != 'data/processed_phase_3/vector_db':
+            logger.info(f"Vector DB directory override: {args.vector_db_dir}")
+        if args.chunks_file != 'data/processed_phase_3/chunks.json':
+            logger.info(f"Chunks file override: {args.chunks_file}")
+        if args.embeddings_file != 'data/processed_phase_3/embeddings.npy':
+            logger.info(f"Embeddings file override: {args.embeddings_file}")
+        if args.metadata_file != 'data/processed_phase_3/embeddings_meta.json':
+            logger.info(f"Metadata file override: {args.metadata_file}")
+        if args.output_dir != 'data/processed_phase_3':
+            logger.info(f"Output directory override: {args.output_dir}")
+        
+        # Create evaluator with CLI overrides
+        evaluator = QualityEvaluator(
+            config=config,
+            vector_db_dir=args.vector_db_dir,
+            chunks_file=args.chunks_file,
+            embeddings_file=args.embeddings_file,
+            metadata_file=args.metadata_file,
+            output_dir=args.output_dir
+        )
+        
+        # Run the evaluation
         evaluator.run()
+        
+        logger.info("Quality evaluation completed successfully!")
+        logger.info("ارزیابی کیفیت با موفقیت انجام شد!")
+        print("[SUCCESS] Quality evaluation completed successfully!")
+        print(f"Reports saved to: {args.output_dir}")
+        
+    except KeyboardInterrupt:
+        logger.error("Process interrupted by user")
+        logger.error("فرآیند توسط کاربر متوقف شد")
+        print("[INTERRUPTED] Process interrupted by user")
+        return 130
         
     except Exception as e:
         logger.error(f"خطای کلی: {str(e)}")
         logger.error(f"General error: {str(e)}")
+        print(f"[ERROR] Quality evaluation failed: {str(e)}")
         return 1
     
     return 0

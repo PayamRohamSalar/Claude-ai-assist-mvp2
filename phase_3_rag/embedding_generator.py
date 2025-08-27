@@ -10,10 +10,12 @@ This module loads text chunks from chunks.json and generates embeddings
 using Sentence Transformers models.
 """
 
+import argparse
 import json
 import logging
 import os
 import hashlib
+import sys
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
@@ -46,13 +48,19 @@ class EmbeddingGenerator:
     Text Embedding Generator Class
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], chunks_file: Optional[str] = None, 
+                 output_dir: Optional[str] = None, model_name: Optional[str] = None,
+                 batch_size: Optional[int] = None):
         """
         راه‌اندازی تولیدکننده بردارها
         Initialize the embedding generator
         
         Args:
             config: Dictionary containing configuration parameters
+            chunks_file: Override path to chunks.json file
+            output_dir: Override output directory
+            model_name: Override model name
+            batch_size: Override batch size
         """
         if not HAS_SENTENCE_TRANSFORMERS:
             raise ImportError(
@@ -65,17 +73,21 @@ class EmbeddingGenerator:
         self.config = config
         self.rag_config = config.get('rag', {})
         
-        # Model configuration
-        self.model_name = self.rag_config.get('embedding_model', 'paraphrase-multilingual-MiniLM-L12-v2')
-        self.batch_size = self.rag_config.get('batch_size', 256)
+        # Model configuration with CLI overrides
+        self.model_name = model_name or self.rag_config.get('embedding_model', 'paraphrase-multilingual-MiniLM-L12-v2')
+        self.batch_size = batch_size or self.rag_config.get('batch_size', 256)
         
-        # Paths
-        self.chunks_path = Path("data/processed_phase_3/chunks.json")
-        self.embeddings_path = Path("data/processed_phase_3/embeddings.npy")
-        self.meta_path = Path("data/processed_phase_3/embeddings_meta.json")
+        # Paths with CLI overrides
+        chunks_file = chunks_file or "data/processed_phase_3/chunks.json"
+        output_dir = output_dir or "data/processed_phase_3"
+        
+        self.chunks_path = Path(chunks_file)
+        self.output_dir = Path(output_dir)
+        self.embeddings_path = self.output_dir / "embeddings.npy"
+        self.meta_path = self.output_dir / "embeddings_meta.json"
         
         # Ensure output directory exists
-        self.embeddings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.model: Optional[SentenceTransformer] = None
         self.chunks: List[Dict[str, Any]] = []
@@ -359,27 +371,91 @@ class EmbeddingGenerator:
             raise
 
 
-def load_config() -> Dict[str, Any]:
+def create_cli_parser() -> argparse.ArgumentParser:
+    """
+    Create command line argument parser for embedding generator.
+    
+    Returns:
+        argparse.ArgumentParser: Configured argument parser
+    """
+    parser = argparse.ArgumentParser(
+        description="Generate embeddings for text chunks using Sentence Transformers",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage examples:
+  python embedding_generator.py
+  python embedding_generator.py --chunks-file data/chunks.json
+  python embedding_generator.py --output-dir output/ --model-name all-MiniLM-L6-v2
+  python embedding_generator.py --batch-size 128 --model-name paraphrase-multilingual-MiniLM-L12-v2
+        """
+    )
+    
+    parser.add_argument(
+        '--chunks-file',
+        default='data/processed_phase_3/chunks.json',
+        help='Path to chunks.json file (default: data/processed_phase_3/chunks.json)'
+    )
+    
+    parser.add_argument(
+        '--output-dir',
+        default='data/processed_phase_3',
+        help='Output directory for embeddings.npy and embeddings_meta.json (default: data/processed_phase_3)'
+    )
+    
+    parser.add_argument(
+        '--model-name',
+        help='Sentence Transformers model name (default: from config)'
+    )
+    
+    parser.add_argument(
+        '--batch-size',
+        type=int,
+        help='Batch size for embedding generation (default: from config)'
+    )
+    
+    parser.add_argument(
+        '--config',
+        default='config/config.json',
+        help='Configuration file path (default: config/config.json)'
+    )
+    
+    return parser
+
+
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """
     بارگذاری تنظیمات از فایل کانفیگ
     Load configuration from config file
     
+    Args:
+        config_path: Specific config file path to load
+    
     Returns:
         Dict[str, Any]: Configuration dictionary
     """
-    config_paths = [
+    config_paths = []
+    
+    # If specific path provided, try it first
+    if config_path and os.path.exists(config_path):
+        config_paths.append(config_path)
+    
+    # Fallback paths
+    config_paths.extend([
+        "config/config.json",
         "config.json",
         "data/config.json",
         "phase_3_rag/config.json"
-    ]
+    ])
     
-    for config_path in config_paths:
-        if os.path.exists(config_path):
+    for path in config_paths:
+        if os.path.exists(path):
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                logger.info(f"Loading config from: {path}")
+                with open(path, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except Exception as e:
-                logger.warning(f"خطا در بارگذاری کانفیگ از {config_path}: {e}")
+                logger.warning(f"خطا در بارگذاری کانفیگ از {path}: {e}")
+                logger.warning(f"Error loading config from {path}: {e}")
                 continue
     
     # Default configuration
@@ -400,13 +476,49 @@ def main():
     Main function for standalone execution
     """
     try:
-        config = load_config()
-        generator = EmbeddingGenerator(config)
+        # Parse command line arguments
+        parser = create_cli_parser()
+        args = parser.parse_args()
+        
+        # Load configuration
+        config = load_config(args.config)
+        
+        # Log CLI overrides if provided
+        if args.model_name:
+            logger.info(f"Model name override: {args.model_name}")
+        if args.batch_size:
+            logger.info(f"Batch size override: {args.batch_size}")
+        if args.chunks_file != 'data/processed_phase_3/chunks.json':
+            logger.info(f"Chunks file override: {args.chunks_file}")
+        if args.output_dir != 'data/processed_phase_3':
+            logger.info(f"Output directory override: {args.output_dir}")
+        
+        # Create generator with CLI overrides
+        generator = EmbeddingGenerator(
+            config=config,
+            chunks_file=args.chunks_file,
+            output_dir=args.output_dir,
+            model_name=args.model_name,
+            batch_size=args.batch_size
+        )
+        
+        # Run the generator
         generator.run()
+        
+        logger.info("Embedding generation completed successfully!")
+        logger.info("تولید بردارها با موفقیت انجام شد!")
+        print("[SUCCESS] Embedding generation completed successfully!")
+        
+    except KeyboardInterrupt:
+        logger.error("Process interrupted by user")
+        logger.error("فرآیند توسط کاربر متوقف شد")
+        print("[INTERRUPTED] Process interrupted by user")
+        return 130
         
     except Exception as e:
         logger.error(f"خطای کلی: {str(e)}")
         logger.error(f"General error: {str(e)}")
+        print(f"[ERROR] Embedding generation failed: {str(e)}")
         return 1
     
     return 0
