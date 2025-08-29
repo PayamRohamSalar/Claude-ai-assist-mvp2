@@ -94,12 +94,19 @@ class TestLegalRAGEngine:
             mock_client.generate.return_value = "تست پاسخ از مدل آزمایشی"
             mock_llm.return_value = mock_client
             
-            # Mock specific methods instead of global file operations
+            # Mock specific methods with realistic templates
+            default_templates = {
+                "default": "سؤال:\n{question}\n\nمتون بازیابی‌شده (با استناد):\n{retrieved_text}\n\nلطفاً پاسخ را به فارسی و به‌صورت فشرده بنویس و حتماً شماره ماده/تبصره و نام قانون را ذکر کن.",
+                "compare": "هدف: مقایسه یا تضاد بین دو متن حقوقی.\nسؤال:\n{question}\n\nمتون بازیابی‌شده:\n{retrieved_text}\n\nلطفاً شباهت‌ها، تفاوت‌ها و هرگونه تعارض را توضیح بده و به مواد/تبصره‌های متناظر اشاره کن.",
+                "draft": "هدف: تهیهٔ پیش‌نویس متن حقوقی منطبق با چارچوب‌های موجود.\nشرح درخواست:\n{question}\n\nمنابع مرتبط:\n{retrieved_text}\n\nپیش‌نویس پیشنهادی را با زبان رسمی، ساختار روشن، و همراه با استنادات دقیق ارائه کن."
+            }
+            
             with patch.object(LegalRAGEngine, '_load_chunks', return_value=sample_chunks):
                 with patch.object(LegalRAGEngine, '_connect_vector_store', return_value=None):
-                    engine = LegalRAGEngine(config_path=temp_config_file)
-                    engine.chunks = sample_chunks  # Set chunks directly for consistency
-                    yield engine
+                    with patch.object(LegalRAGEngine, '_load_prompt_templates', return_value=default_templates):
+                        engine = LegalRAGEngine(config_path=temp_config_file)
+                        engine.chunks = sample_chunks  # Set chunks directly for consistency
+                        yield engine
     
     def test_retrieve_returns_results(self, mock_rag_engine, sample_chunks):
         """Test that retrieve returns results with required keys."""
@@ -214,13 +221,14 @@ class TestLegalRAGEngine:
         with patch('phase_4_llm_rag.api_connections.get_llm_client'):
             with patch.object(LegalRAGEngine, '_load_chunks', return_value=[]):
                 with patch.object(LegalRAGEngine, '_connect_vector_store', return_value=None):
-                    engine = LegalRAGEngine(config_path=temp_config_file)
-                    
-                    # Assert config is loaded
-                    assert engine.config is not None
-                    assert engine.config["llm"]["provider"] == "ollama"
-                    assert engine.config["llm"]["model"] == "qwen2.5:7b-instruct"
-                    assert engine.config["retriever"]["backend"] == "faiss"
+                    with patch.object(LegalRAGEngine, '_load_prompt_templates', return_value={}):
+                        engine = LegalRAGEngine(config_path=temp_config_file)
+                        
+                        # Assert config is loaded
+                        assert engine.config is not None
+                        assert engine.config["llm"]["provider"] == "ollama"
+                        assert engine.config["llm"]["model"] == "qwen2.5:7b-instruct"
+                        assert engine.config["retriever"]["backend"] == "faiss"
     
     def test_prompt_templates_fallback(self, temp_config_file):
         """Test fallback to default templates when file is missing."""
@@ -249,6 +257,7 @@ class TestLegalRAGEngineIntegration:
         if os.path.exists(chunks_path):
             with patch('phase_4_llm_rag.api_connections.get_llm_client'):
                 with patch.object(LegalRAGEngine, '_connect_vector_store', return_value=None):
+                    # Let it load real templates or use fallback
                     engine = LegalRAGEngine(config_path="phase_4_llm_rag/Rag_config.json")
                     
                     # Assert chunks are loaded
