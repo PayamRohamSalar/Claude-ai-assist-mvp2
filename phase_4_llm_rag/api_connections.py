@@ -2,6 +2,7 @@ import requests
 import json
 import logging
 import os
+import re
 from typing import Dict, Any, List
 
 try:
@@ -45,6 +46,66 @@ def _normalize_model_tag(model: str) -> str:
         Normalized model name
     """
     return model.strip() if model else ""
+
+
+class FakeLLMClient:
+    """Fake LLM client for testing purposes."""
+    
+    def __init__(self, model: str = "fake-model", **kwargs) -> None:
+        """Initialize fake LLM client.
+        
+        Args:
+            model: Model name (ignored for fake client)
+            **kwargs: Additional arguments (ignored)
+        """
+        self.model = model
+        logger.info(f"Initialized FakeLLMClient with model: {model}")
+    
+    def ping(self) -> bool:
+        """Always returns True for fake client."""
+        return True
+    
+    def list_models(self) -> List[str]:
+        """Returns a fake list of models."""
+        return ["fake-model", "test-model"]
+    
+    def generate(self, prompt: str, temperature: float = 0.1, max_tokens: int = 4096, **kwargs) -> str:
+        """Generate a fake response based on simple rules.
+        
+        Args:
+            prompt: Input prompt
+            temperature: Temperature (ignored)
+            max_tokens: Max tokens (ignored)
+            **kwargs: Additional arguments (ignored)
+            
+        Returns:
+            A rule-based fake response
+        """
+        prompt_lower = prompt.lower()
+        
+        # Rule-based responses for common patterns
+        if 'سؤال' in prompt or 'question' in prompt_lower:
+            if 'ماده' in prompt or 'article' in prompt_lower:
+                return (
+                    "بر اساس اسناد بازیابی‌شده، ماده ۱۲ قانون مربوطه بیان می‌کند که... "
+                    "[این پاسخ توسط FakeLLMClient تولید شده است.] "
+                    "برای اطلاعات دقیق‌تر، لطفاً به متن کامل قانون مراجعه کنید."
+                )
+            elif 'تبصره' in prompt or 'note' in prompt_lower:
+                return (
+                    "تبصره ۱ در این خصوص مقرر می‌دارد که... "
+                    "[این پاسخ توسط FakeLLMClient تولید شده است.] "
+                    "جهت مطالعه کامل، به متن اصلی مراجعه شود."
+                )
+            else:
+                return (
+                    "بر اساس بررسی اسناد موجود، پاسخ سؤال شما به شرح زیر است: "
+                    "[این یک پاسخ آزمایشی از FakeLLMClient است.] "
+                    "لطفاً برای دریافت پاسخ دقیق از مدل واقعی استفاده کنید."
+                )
+        else:
+            # Echo the prompt with a prefix
+            return f"[FakeLLMClient Echo] {prompt[:200]}{'...' if len(prompt) > 200 else ''}"
 
 
 class OllamaClient:
@@ -110,13 +171,14 @@ class OllamaClient:
             logger.error(f"Error listing Ollama models: {e}")
             return []
     
-    def generate(self, prompt: str, temperature: float = 0.1, max_tokens: int = 4096) -> str:
+    def generate(self, prompt: str, temperature: float = 0.1, max_tokens: int = 4096, **kwargs) -> str:
         """Generate text using Ollama API.
         
         Args:
             prompt: Input prompt for text generation
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum number of tokens to generate
+            **kwargs: Additional arguments (ignored for compatibility)
             
         Returns:
             Generated text response
@@ -196,7 +258,7 @@ def make_llm_client(config: Dict[str, Any]):
     
     Configuration precedence: environment variables > config file > defaults
     Environment variables:
-        - LLM_PROVIDER: LLM provider (default: ollama)
+        - LLM_PROVIDER: LLM provider (ollama, fake)
         - OLLAMA_BASE_URL: Ollama server URL
         - OLLAMA_TIMEOUT: Request timeout in seconds
         - OLLAMA_MODEL_NAME: Primary model name
@@ -210,7 +272,7 @@ def make_llm_client(config: Dict[str, Any]):
         
     Raises:
         NotImplementedError: If provider is not supported
-        KeyError: If no primary model is configured
+        KeyError: If no primary model is configured (for non-fake providers)
         ValueError: If requested model is not available and no valid backup
     """
     cfg = config.get("llm", {})
@@ -218,63 +280,71 @@ def make_llm_client(config: Dict[str, Any]):
     # Resolve provider with precedence
     provider = _pick("LLM_PROVIDER", cfg, "provider", "ollama").lower()
     
-    if provider != "ollama":
-        error_msg = f"Unsupported LLM provider: {provider}. Only 'ollama' is currently supported."
-        logger.error(error_msg)
-        raise NotImplementedError("تنها ارائه‌دهنده Ollama پشتیبانی می‌شود")
+    # Handle fake provider for testing
+    if provider == "fake":
+        logger.info("Creating fake LLM client for testing")
+        model = _pick("OLLAMA_MODEL_NAME", cfg, "model", "fake-model")
+        return FakeLLMClient(model=model)
     
-    # Resolve Ollama settings with precedence (env > cfg > defaults)
-    base_url = _pick("OLLAMA_BASE_URL", cfg, "base_url", "http://localhost:11434")
-    timeout = int(_pick("OLLAMA_TIMEOUT", cfg, "timeout_s", 60))
-    model = _pick("OLLAMA_MODEL_NAME", cfg, "model", None)
-    backup = _pick("OLLAMA_BACKUP_MODEL", cfg, "backup_model", None)
-    
-    if model is None:
-        raise KeyError("No primary LLM model configured (env OLLAMA_MODEL_NAME or llm.model).")
-    
-    # Normalize model names
-    model = _normalize_model_tag(model)
-    backup = _normalize_model_tag(backup) if backup else None
-    
-    logger.info(f"Creating Ollama client for model: {model}")
-    
-    # Create provisional client
-    client = OllamaClient(model=model, base_url=base_url, timeout=timeout)
-    
-    # Validate model availability
-    try:
-        available_models = client.list_models()
-        available = set(available_models)
+    # Handle Ollama provider
+    elif provider == "ollama":
+        # Resolve Ollama settings with precedence (env > cfg > defaults)
+        base_url = _pick("OLLAMA_BASE_URL", cfg, "base_url", "http://localhost:11434")
+        timeout = int(_pick("OLLAMA_TIMEOUT", cfg, "timeout_s", 60))
+        model = _pick("OLLAMA_MODEL_NAME", cfg, "model", None)
+        backup = _pick("OLLAMA_BACKUP_MODEL", cfg, "backup_model", None)
         
-        logger.debug(f"Available models: {available_models}")
+        if model is None:
+            raise KeyError("No primary LLM model configured (env OLLAMA_MODEL_NAME or llm.model).")
         
-        if model not in available:
-            if backup and backup in available:
-                logger.warning(
-                    f"Primary model '{model}' not found. Switching to backup model '{backup}'."
-                )
-                client = OllamaClient(model=backup, base_url=base_url, timeout=timeout)
-            else:
-                error_msg = f"Requested model '{model}' not found on Ollama server"
-                if backup:
-                    error_msg += f" and backup model '{backup}' is also not available"
-                else:
-                    error_msg += " and no backup model configured"
-                
-                logger.error(error_msg)
-                raise ValueError(f"مدل '{model}' در سرور Ollama یافت نشد و مدل پشتیبان معتبری موجود نیست.")
-        else:
-            logger.info(f"Model '{model}' verified as available on Ollama server")
+        # Normalize model names
+        model = _normalize_model_tag(model)
+        backup = _normalize_model_tag(backup) if backup else None
+        
+        logger.info(f"Creating Ollama client for model: {model}")
+        
+        # Create provisional client
+        client = OllamaClient(model=model, base_url=base_url, timeout=timeout)
+        
+        # Validate model availability
+        try:
+            available_models = client.list_models()
+            available = set(available_models)
             
-    except Exception as e:
-        if "not found" in str(e).lower() or "available" in str(e).lower():
-            # Re-raise model availability errors
-            raise
-        else:
-            # Log other errors but don't fail - server might still work
-            logger.warning(f"Could not verify model availability: {e}")
+            logger.debug(f"Available models: {available_models}")
+            
+            if model not in available:
+                if backup and backup in available:
+                    logger.warning(
+                        f"Primary model '{model}' not found. Switching to backup model '{backup}'."
+                    )
+                    client = OllamaClient(model=backup, base_url=base_url, timeout=timeout)
+                else:
+                    error_msg = f"Requested model '{model}' not found on Ollama server"
+                    if backup:
+                        error_msg += f" and backup model '{backup}' is also not available"
+                    else:
+                        error_msg += " and no backup model configured"
+                    
+                    logger.error(error_msg)
+                    raise ValueError(f"مدل '{model}' در سرور Ollama یافت نشد و مدل پشتیبان معتبری موجود نیست.")
+            else:
+                logger.info(f"Model '{model}' verified as available on Ollama server")
+                
+        except Exception as e:
+            if "not found" in str(e).lower() or "available" in str(e).lower():
+                # Re-raise model availability errors
+                raise
+            else:
+                # Log other errors but don't fail - server might still work
+                logger.warning(f"Could not verify model availability: {e}")
+        
+        return client
     
-    return client
+    else:
+        error_msg = f"Unsupported LLM provider: {provider}. Supported providers: 'ollama', 'fake'."
+        logger.error(error_msg)
+        raise NotImplementedError(f"ارائه‌دهنده '{provider}' پشتیبانی نمی‌شود. ارائه‌دهندگان پشتیبانی‌شده: ollama, fake")
 
 
 # Alias for backwards compatibility with rag_engine.py

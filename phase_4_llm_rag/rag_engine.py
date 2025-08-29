@@ -5,6 +5,7 @@ import logging
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 import os
+import re
 
 try:
     import faiss
@@ -17,6 +18,11 @@ try:
     import chromadb
 except ImportError:
     chromadb = None
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
 
 try:
     from .api_connections import get_llm_client
@@ -115,7 +121,19 @@ class LegalRAGEngine:
         else:
             self.config_path = config_path
         self.config = self._load_config()
+        
+        # Validate vector_store configuration
+        if not self.config.get('vector_store'):
+            raise ValueError(
+                "تنظیمات vector_store موجود نیست.\n"
+                "Vector store configuration is missing.\n"
+                "لطفاً بخش vector_store را با type، index_path و embeddings_path در فایل تنظیمات اضافه کنید.\n"
+                "Please add vector_store section with type, index_path, and embeddings_path to the config file."
+            )
+        
         self.chunks = self._load_chunks()
+        self.embeddings_meta = self._load_embeddings_meta()
+        self.embedding_model = self._load_embedding_model()
         self.vector_store = self._connect_vector_store()
         db_path = self.config.get("database_path", "legal_assistant.db")
         self.db_path = os.path.abspath(db_path) if not os.path.isabs(db_path) else db_path
@@ -149,7 +167,16 @@ class LegalRAGEngine:
             chunks_path = os.path.abspath(chunks_path)
         try:
             with open(chunks_path, 'r', encoding='utf-8') as f:
-                chunks = json.load(f)
+                data = json.load(f)
+            
+            # Handle different chunk file formats
+            if isinstance(data, dict) and 'chunks' in data:
+                chunks = data['chunks']
+            elif isinstance(data, list):
+                chunks = data
+            else:
+                chunks = []
+            
             logger.info(f"Loaded {len(chunks)} chunks from {chunks_path}")
             return chunks
         except FileNotFoundError:
@@ -158,6 +185,52 @@ class LegalRAGEngine:
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in chunks file: {e}")
             raise
+    
+    def _load_embeddings_meta(self) -> Dict[str, Any]:
+        """Load embeddings metadata from embeddings_meta.json file."""
+        embeddings_path = self.config.get('vector_store', {}).get('embeddings_path', '')
+        if embeddings_path:
+            # Infer metadata path from embeddings path
+            embeddings_dir = os.path.dirname(embeddings_path)
+            meta_path = os.path.join(embeddings_dir, 'embeddings_meta.json')
+        else:
+            meta_path = 'data/processed_phase_3/embeddings_meta.json'
+        
+        if not os.path.isabs(meta_path):
+            meta_path = os.path.abspath(meta_path)
+        
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            logger.info(f"Loaded embeddings metadata from {meta_path}")
+            return meta
+        except FileNotFoundError:
+            logger.warning(f"Embeddings metadata file not found: {meta_path}")
+            return {}
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in embeddings metadata file: {e}")
+            return {}
+    
+    def _load_embedding_model(self) -> Optional[object]:
+        """Load the embedding model used for encoding queries."""
+        if not SentenceTransformer:
+            logger.warning("sentence-transformers not available, falling back to keyword search")
+            return None
+        
+        try:
+            # Get model name from metadata or use default
+            model_name = self.embeddings_meta.get('model_name', 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+            # Remove 'sentence-transformers/' prefix if present for loading
+            if model_name.startswith('sentence-transformers/'):
+                model_name = model_name.replace('sentence-transformers/', '')
+            
+            logger.info(f"Loading embedding model: {model_name}")
+            model = SentenceTransformer(model_name)
+            logger.info("Embedding model loaded successfully")
+            return model
+        except Exception as e:
+            logger.warning(f"Failed to load embedding model: {e}. Falling back to keyword search.")
+            return None
     
     def _connect_vector_store(self):
         """Connect to vector store (FAISS or Chroma) based on configuration."""
@@ -224,8 +297,15 @@ class LegalRAGEngine:
     def retrieve(self, question: str, top_k: int = 5, filters: Optional[Dict] = None) -> List[Dict]:
         """Search vector index for most relevant chunks with optional metadata filtering."""
         if not self.vector_store:
-            logger.error("Vector store not available")
-            return []
+            logger.warning("Vector store not available, using fallback keyword search")
+            # Get allowed document UIDs if filters are provided
+            allowed_uids = None
+            if filters:
+                allowed_uids = self._apply_metadata_filters(filters)
+                if not allowed_uids:
+                    logger.info("No documents match the provided filters")
+                    return []
+            return self._fallback_keyword_search(question, top_k, allowed_uids)
         
         # Get allowed document UIDs if filters are provided
         allowed_uids = None
@@ -240,8 +320,9 @@ class LegalRAGEngine:
             return self._search_faiss(question, top_k, allowed_uids)
         elif self.vector_store['type'] == 'chroma':
             return self._search_chroma(question, top_k, allowed_uids)
-        
-        return []
+        else:
+            # No vector store available, use fallback
+            return self._fallback_keyword_search(question, top_k, allowed_uids)
     
     def _apply_metadata_filters(self, filters: Dict) -> Optional[List[str]]:
         """Apply metadata filters by querying SQLite DB to get allowed document UIDs."""
@@ -277,16 +358,58 @@ class LegalRAGEngine:
     
     def _search_faiss(self, question: str, top_k: int, allowed_uids: Optional[List[str]]) -> List[Dict]:
         """Search using FAISS index."""
-        # This is a placeholder - actual implementation would require embedding the question
-        # and performing similarity search
-        logger.warning("FAISS search not fully implemented - returning filtered chunks")
-        
-        # Filter chunks based on allowed UIDs
-        filtered_chunks = self.chunks
-        if allowed_uids:
-            filtered_chunks = [chunk for chunk in self.chunks if chunk.get('document_uid') in allowed_uids]
-        
-        return filtered_chunks[:top_k]
+        try:
+            # Check if we have the embedding model
+            if not self.embedding_model:
+                logger.warning("Embedding model not available, falling back to keyword search")
+                return self._fallback_keyword_search(question, top_k, allowed_uids)
+            
+            # Encode the question
+            question_vector = self.embedding_model.encode([question], convert_to_numpy=True)
+            question_vector = question_vector.astype(np.float32)
+            
+            # Search the FAISS index
+            index = self.vector_store['index']
+            distances, indices = index.search(question_vector, top_k * 2)  # Get more results for filtering
+            
+            # Get chunk UID order from metadata
+            chunk_uid_order = self.embeddings_meta.get('chunk_uid_order', [])
+            if not chunk_uid_order:
+                logger.warning("No chunk_uid_order found in embeddings metadata")
+                return self._fallback_keyword_search(question, top_k, allowed_uids)
+            
+            # Map indices to chunk UIDs and filter
+            results = []
+            for i, (distance, idx) in enumerate(zip(distances[0], indices[0])):
+                if idx >= len(chunk_uid_order):
+                    continue
+                
+                chunk_uid = chunk_uid_order[idx]
+                
+                # Find the chunk with this UID
+                chunk = next((c for c in self.chunks if c.get('uid') == chunk_uid or c.get('chunk_uid') == chunk_uid), None)
+                if not chunk:
+                    continue
+                
+                # Apply allowed_uids filter if provided
+                if allowed_uids and chunk.get('document_uid') not in allowed_uids:
+                    continue
+                
+                # Add similarity score
+                chunk_with_score = chunk.copy()
+                chunk_with_score['similarity_score'] = float(1.0 / (1.0 + distance))  # Convert distance to similarity
+                results.append(chunk_with_score)
+                
+                if len(results) >= top_k:
+                    break
+            
+            logger.info(f"FAISS search returned {len(results)} results")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in FAISS search: {e}")
+            logger.info("Falling back to keyword search")
+            return self._fallback_keyword_search(question, top_k, allowed_uids)
     
     def _search_chroma(self, question: str, top_k: int, allowed_uids: Optional[List[str]]) -> List[Dict]:
         """Search using Chroma collection."""
@@ -323,20 +446,66 @@ class LegalRAGEngine:
             logger.error(f"Error during Chroma search: {e}")
             return []
     
+    def _fallback_keyword_search(self, question: str, top_k: int, allowed_uids: Optional[List[str]]) -> List[Dict]:
+        """Fallback keyword-based search when vector store is unavailable."""
+        logger.info("Using fallback keyword search")
+        
+        # Convert question to lowercase for case-insensitive matching
+        question_lower = question.lower()
+        question_words = set(question_lower.split())
+        
+        # Score chunks based on keyword overlap
+        scored_chunks = []
+        for chunk in self.chunks:
+            # Skip invalid chunks
+            if not isinstance(chunk, dict):
+                continue
+                
+            # Apply allowed_uids filter if provided
+            if allowed_uids and chunk.get('document_uid') not in allowed_uids:
+                continue
+            
+            # Get chunk text
+            text = chunk.get('text', '').lower()
+            text_words = set(text.split())
+            
+            # Calculate simple keyword overlap score
+            overlap = len(question_words.intersection(text_words))
+            if overlap > 0:
+                # Normalize by question length
+                score = overlap / len(question_words)
+                chunk_with_score = chunk.copy()
+                chunk_with_score['keyword_score'] = score
+                scored_chunks.append(chunk_with_score)
+        
+        # Sort by score and return top_k
+        scored_chunks.sort(key=lambda x: x['keyword_score'], reverse=True)
+        result = scored_chunks[:top_k]
+        
+        logger.info(f"Keyword search returned {len(result)} results")
+        return result
+    
     def build_prompt(self, question: str, retrieved_chunks: List[Dict], template_name: str = "default") -> str:
         """Build prompt using template and retrieved chunks."""
         template = self.prompt_templates.get(template_name, self.prompt_templates["default"])
         
-        # Concatenate retrieved chunks with citations
+        # Concatenate retrieved chunks with consistent citations
         retrieved_text = ""
         for i, chunk in enumerate(retrieved_chunks, 1):
             text = chunk.get('text', '')
             document_uid = chunk.get('document_uid', 'نامشخص')
-            article_number = chunk.get('article_number', 'نامشخص')
+            document_title = chunk.get('document_title', chunk.get('title', ''))
+            article_number = chunk.get('article_number', '')
             note_label = chunk.get('note_label', '')
             
-            citation = f"[{i}] {document_uid}"
-            if article_number != 'نامشخص':
+            # Build consistent citation format: [n] document_title (document_uid) - ماده number note_label
+            citation = f"[{i}] "
+            if document_title:
+                citation += f"{document_title} ({document_uid})"
+            else:
+                citation += document_uid
+            
+            if article_number:
                 citation += f" - ماده {article_number}"
             if note_label:
                 citation += f" - {note_label}"
@@ -361,10 +530,12 @@ class LegalRAGEngine:
         
         try:
             # Call LLM (implementation depends on api_connections.py)
+            llm_config = self.config.get('llm', {})
             response = self.llm_client.generate(
                 prompt=prompt,
-                max_tokens=self.config.get('max_tokens', 4000),
-                temperature=self.config.get('temperature', 0.3)
+                max_tokens=llm_config.get('max_tokens', 4000),
+                temperature=llm_config.get('temperature', 0.3),
+                timeout_s=llm_config.get('timeout_s', 60)
             )
             
             # Extract answer from response (OllamaClient.generate returns a string)
@@ -392,25 +563,80 @@ class LegalRAGEngine:
             }
     
     def _extract_citations_from_answer(self, answer: str) -> List[Dict]:
-        """Extract citations from generated answer (simple regex-based approach)."""
-        import re
-        
+        """Extract citations from generated answer using inline citation markers."""
         citations = []
-        # Look for patterns like "ماده ۱۲" or "تبصره ۱"
-        patterns = [
-            r'ماده\s*(\d+)',
-            r'تبصره\s*(\d+)',
-            r'بند\s*(\d+)'
+        
+        # Extract inline citation markers like [1] document_title (document_uid) - ماده 12 - note
+        # or [2] document_uid - ماده 5
+        # Updated pattern to stop at punctuation that ends the citation
+        citation_pattern = r'\[(\d+)\]\s*([^\[\n,،.。؟!]+?)(?=[,،.。؟!]|\[|$|\n)'
+        matches = re.findall(citation_pattern, answer, re.MULTILINE | re.DOTALL)
+        
+        for match in matches:
+            citation_num, citation_text = match
+            citation_text = citation_text.strip()
+            
+            # Parse the citation text to extract components
+            document_uid = 'نامشخص'
+            document_title = ''
+            article_number = ''
+            note_label = ''
+            
+            # Try to extract document info: title (uid) or just uid
+            doc_match = re.search(r'([^\(]+)\(([^\)]+)\)', citation_text)
+            if doc_match:
+                document_title = doc_match.group(1).strip()
+                document_uid = doc_match.group(2).strip()
+            else:
+                # Look for document_uid at the beginning
+                parts = citation_text.split(' - ', 1)
+                if parts:
+                    document_uid = parts[0].strip()
+            
+            # Extract article number (support both ASCII and Persian numerals)
+            article_match = re.search(r'ماده\s*([\d۰-۹]+)', citation_text)
+            if article_match:
+                article_number = article_match.group(1)
+            
+            # Extract note label (everything after the last -)
+            note_parts = citation_text.split(' - ')
+            if len(note_parts) > 2:  # More than doc - ماده
+                potential_note = note_parts[-1].strip()
+                if not re.match(r'ماده\s*\d+', potential_note):  # Not an article reference
+                    # Extract only the note identifier, not the full descriptive text
+                    note_match = re.match(r'(تبصره\s*\d+|بند\s*\d+|ذیل\s*\d+)', potential_note)
+                    if note_match:
+                        note_label = note_match.group(1)
+                    else:
+                        # If no specific pattern, take the whole thing but limit length
+                        note_label = potential_note[:50]  # Limit to 50 characters
+            
+            citations.append({
+                'document_uid': document_uid,
+                'document_title': document_title,
+                'article_number': article_number,
+                'note_label': note_label if note_label else None
+            })
+        
+        # Also look for standalone legal references
+        legal_patterns = [
+            (r'ماده\s*(\d+)', 'article'),
+            (r'تبصره\s*(\d+)', 'note'),
+            (r'بند\s*(\d+)', 'clause')
         ]
         
-        for pattern in patterns:
+        for pattern, ref_type in legal_patterns:
             matches = re.findall(pattern, answer)
             for match in matches:
-                citations.append({
-                    'document_uid': 'نامشخص',
-                    'article_number': match,
-                    'note_label': None
-                })
+                # Only add if not already captured in inline citations
+                existing = any(c.get('article_number') == match for c in citations)
+                if not existing:
+                    citations.append({
+                        'document_uid': 'نامشخص',
+                        'document_title': '',
+                        'article_number': match if ref_type == 'article' else '',
+                        'note_label': f'{ref_type} {match}' if ref_type != 'article' else None
+                    })
         
         return citations
     

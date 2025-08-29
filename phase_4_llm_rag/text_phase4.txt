@@ -1,0 +1,4 @@
+# How to use the new CLI (ask_cli.py) quickly
+python phase_4_llm_rag/ask_cli.py --question "ماده واحده قانون استفاده از خدمت خارج از وقت اداری اعضای هیئت علمی چیست؟" --show-sources
+python phase_4_llm_rag/ask_cli.py --question "مأموریت‌های اصلی و حدود اختیارات وزارت علوم، تحقیقات و فنّاوری را نام ببر" --template compare --top-k 7 --show-sources
+python phase_4_llm_rag/ask_cli.py --question "یک پیش‌نویس بند برای ثبت داده‌های پژوهشی پیشنهاد بده." --template draft --filter document_type=bylaw --pretty --show-sources

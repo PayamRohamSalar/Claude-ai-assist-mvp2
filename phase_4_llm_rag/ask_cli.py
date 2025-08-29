@@ -59,8 +59,8 @@ def parse_args() -> argparse.Namespace:
     # Configuration
     parser.add_argument(
         "--config", 
-        default="phase_4_llm_rag/Rag_config.json",
-        help="مسیر فایل تنظیمات (پیش‌فرض: phase_4_llm_rag/Rag_config.json)"
+        default="Rag_config.json",
+        help="مسیر فایل تنظیمات (پیش‌فرض: Rag_config.json)"
     )
     
     # Query parameters
@@ -220,12 +220,19 @@ def validate_config_and_artifacts(config_path: str) -> None:
     Raises:
         FileNotFoundError: If required files are missing
     """
-    if not os.path.exists(config_path):
+    # Handle relative paths the same way as RAG engine
+    if not os.path.isabs(config_path):
+        module_dir = os.path.dirname(__file__)
+        actual_config_path = os.path.join(module_dir, config_path)
+    else:
+        actual_config_path = config_path
+        
+    if not os.path.exists(actual_config_path):
         raise FileNotFoundError(f"فایل تنظیمات یافت نشد: {config_path}")
     
     # Load config to check artifact paths
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(actual_config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
         
         # Check critical paths mentioned in config
