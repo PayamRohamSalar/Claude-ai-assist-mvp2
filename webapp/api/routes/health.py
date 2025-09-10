@@ -2,12 +2,13 @@
 Health check API routes for the Smart Legal Assistant.
 """
 
-import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-logger = logging.getLogger(__name__)
+from webapp.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 

@@ -1,0 +1,12 @@
+# start webapp using either:
+
+python -m webapp.app
+or 
+Bash
+uvicorn webapp.app:app --reload
+
+The application will be available at:
+•  Main UI: http://localhost:8000/
+•  API Docs: http://localhost:8000/api/docs (in debug mode)
+•  Health Check: http://localhost:8000/api/health/
+•  QA Endpoint: http://localhost:8000/api/ask

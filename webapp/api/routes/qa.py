@@ -2,7 +2,6 @@
 Question-Answering API routes for the Smart Legal Assistant.
 """
 
-import logging
 import uuid
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -13,7 +12,9 @@ import os
 # Add the project root to the path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
-logger = logging.getLogger(__name__)
+from webapp.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -64,39 +65,36 @@ async def ask_question(
     try:
         logger.info(f"Processing question request {request_id}: {request.question[:50]}...")
         
-        # Import RAG engine here to avoid import issues during startup
-        from phase_4_llm_rag.rag_engine import LegalRAGEngine
-        
-        # Initialize RAG engine
-        engine = LegalRAGEngine()
+        # Import RAG service
+        from webapp.services.rag_service import get_rag_service, ServiceError
         
         import time
         start_time = time.time()
         
-        # Get answer from RAG engine
-        result = engine.answer(
+        # Get RAG service and process question
+        rag_service = get_rag_service()
+        result = rag_service.answer(
             question=request.question,
             top_k=request.top_k,
-            template_name=request.template,
-            filters=request.filters
+            template=request.template
         )
         
         processing_time = time.time() - start_time
         
-        # Format citations
+        # Format citations for response model
         citations = []
         for citation in result.get("citations", []):
             citations.append(Citation(
-                document_title=citation.get("document_title"),
-                document_uid=citation.get("document_uid"),
-                article_number=citation.get("article_number"),
-                note_label=citation.get("note_label")
+                document_title=citation.get("title", ""),  # Use normalized title
+                document_uid=citation.get("document_uid", ""),
+                article_number=citation.get("article_number", ""),
+                note_label=citation.get("note_label", "")
             ))
         
         response = QuestionResponse(
             answer=result.get("answer", "پاسخی دریافت نشد."),
             citations=citations,
-            retrieved_chunks=result.get("retrieved_chunks", 0),
+            retrieved_chunks=len(result.get("citations", [])),  # Use citation count
             processing_time=processing_time,
             session_id=session_id,
             request_id=request_id
@@ -114,8 +112,19 @@ async def ask_question(
         logger.info(f"Successfully processed request {request_id} in {processing_time:.2f}s")
         return response
         
+    except ServiceError as e:
+        logger.error(f"Service error processing request {request_id} [trace_id: {e.trace_id}]: {e.technical_details}")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "خطا در سرویس",
+                "message": e.user_message,
+                "request_id": request_id,
+                "trace_id": e.trace_id
+            }
+        )
     except Exception as e:
-        logger.error(f"Error processing request {request_id}: {e}")
+        logger.error(f"Unexpected error processing request {request_id}: {e}")
         raise HTTPException(
             status_code=500,
             detail={
