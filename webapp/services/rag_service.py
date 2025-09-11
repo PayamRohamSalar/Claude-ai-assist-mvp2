@@ -36,12 +36,20 @@ class RAGService:
     """Service for handling RAG engine operations with proper error handling."""
     
     def __init__(self):
-        """Initialize RAG service with lazy loading."""
+        """Initialize RAG service, load engine, and perform LLM connectivity ping."""
         self._engine = None
         self._settings = get_settings()
         self._engine_loaded = False
         self._engine_ready = False
         self._last_error = None
+
+        # Eagerly load the engine and perform a lightweight ping so health checks can reflect readiness
+        try:
+            self._load_engine()
+        except ServiceError as e:
+            # Do not raise during service construction; keep service available with engine_ready=False
+            self._last_error = e.technical_details or e.user_message
+            logger.warning(f"[init] Engine load failed: {self._last_error} (trace_id={e.trace_id})")
     
     def _load_engine(self) -> None:
         """Load the Legal RAG Engine once."""
@@ -103,9 +111,9 @@ class RAGService:
             
             self._engine_loaded = True
             
-        except ServiceError:
+        except ServiceError as e:
             # Re-raise ServiceError as-is but cache error info
-            self._last_error = str(e)
+            self._last_error = e.technical_details or e.user_message
             raise
         except Exception as e:
             logger.error(f"[{trace_id}] Unexpected error loading RAG engine: {str(e)}")
@@ -194,6 +202,18 @@ class RAGService:
                 template_name=template
             )
             
+            # Detect connectivity errors bubbled up as text from underlying engine
+            answer_text_for_check = str(result.get("answer", ""))
+            if "امکان اتصال به سرور Ollama وجود ندارد" in answer_text_for_check:
+                base_url = getattr(getattr(self._engine, 'llm_client', None), 'base_url', None)
+                model = getattr(getattr(self._engine, 'llm_client', None), 'model', None)
+                logger.error(f"[{trace_id}] Ollama connectivity error during answer; base_url={base_url}, model={model}")
+                raise ServiceError(
+                    user_message="خطا در تولید پاسخ: امکان اتصال به سرور Ollama وجود ندارد",
+                    technical_details=f"Ollama connectivity failure. base_url={base_url}, model={model}",
+                    trace_id=trace_id
+                )
+
             # Process and normalize the result
             normalized_result = {
                 "answer": result.get("answer", "پاسخی دریافت نشد."),
@@ -215,9 +235,12 @@ class RAGService:
             error_msg = str(e).lower()
             
             if "امکان اتصال به سرور ollama وجود ندارد" in str(e):
+                base_url = getattr(getattr(self._engine, 'llm_client', None), 'base_url', None)
+                model = getattr(getattr(self._engine, 'llm_client', None), 'model', None)
+                logger.error(f"[{trace_id}] Ollama connection error; base_url={base_url}, model={model}")
                 raise ServiceError(
                     user_message="خطا در تولید پاسخ: امکان اتصال به سرور Ollama وجود ندارد",
-                    technical_details=f"Ollama connection error: {str(e)}",
+                    technical_details=f"Ollama connection error: {str(e)} | base_url={base_url}, model={model}",
                     trace_id=trace_id
                 )
             elif "connection" in error_msg or "timeout" in error_msg:
@@ -323,6 +346,32 @@ class RAGService:
         except Exception as e:
             logger.warning(f"RAG service availability check failed: {str(e)}")
             return False
+
+    def get_engine_diagnostics(self) -> Dict[str, Optional[str]]:
+        """Return diagnostics for health endpoint."""
+        try:
+            base_url = getattr(getattr(self._engine, 'llm_client', None), 'base_url', None) if self._engine else None
+            model = getattr(getattr(self._engine, 'llm_client', None), 'model', None) if self._engine else None
+            db_path = getattr(self._engine, 'db_path', None) if self._engine else None
+            vector_store_type = None
+            if self._engine and getattr(self._engine, 'vector_store', None):
+                vector_store_type = self._engine.vector_store.get('type')
+            return {
+                "engine_ready": bool(self._engine_ready),
+                "model": model,
+                "base_url": base_url,
+                "db_path": db_path,
+                "vector_store": vector_store_type,
+            }
+        except Exception as e:
+            logger.warning(f"Diagnostics collection failed: {e}")
+            return {
+                "engine_ready": False,
+                "model": None,
+                "base_url": None,
+                "db_path": None,
+                "vector_store": None,
+            }
 
 
 # Global RAG service instance

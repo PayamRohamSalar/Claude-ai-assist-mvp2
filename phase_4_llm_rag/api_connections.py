@@ -36,6 +36,60 @@ def _pick(env_key: str, cfg: dict, cfg_key: str, default=None):
     return default
 
 
+def _pick_with_source(env_key: str, cfg: dict, cfg_key: str, default=None):
+    """Pick a value with precedence and return its source as well.
+    
+    Precedence: ENV > config > default
+    
+    Returns:
+        (value, source) where source in {"ENV", "config", "default"}
+    """
+    v = os.getenv(env_key)
+    if v not in (None, ""):
+        return v, "ENV"
+    if cfg and cfg_key in cfg and cfg[cfg_key] not in (None, ""):
+        return cfg[cfg_key], "config"
+    return default, "default"
+
+
+def _detect_runtime_environment():
+    """Detect the runtime environment (Windows, WSL, Docker) and suggest appropriate base_url."""
+    import platform
+    import os
+    
+    # Check for Docker environment
+    if os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER'):
+        return "docker", "http://host.docker.internal:11434"
+    
+    # Check for WSL environment 
+    if 'microsoft' in platform.uname().release.lower() or os.getenv('WSL_DISTRO_NAME'):
+        return "wsl", "http://localhost:11434"
+        
+    # Check for Windows environment
+    if platform.system() == "Windows":
+        return "windows", "http://localhost:11434"
+    
+    # Default for Linux/macOS
+    return "unix", "http://localhost:11434"
+
+
+def _adaptive_base_url(configured_base_url: str) -> str:
+    """Adapt base_url based on runtime environment if using default localhost."""
+    # Only adapt if using default localhost URLs
+    if configured_base_url not in ["http://localhost:11434", "http://127.0.0.1:11434"]:
+        return configured_base_url
+    
+    env_type, suggested_url = _detect_runtime_environment()
+    
+    # For Docker, use host.docker.internal to reach host Ollama
+    if env_type == "docker":
+        logger.info(f"🐳 Docker environment detected - adapting base_url to: {suggested_url}")
+        return suggested_url
+    
+    # For other environments, keep localhost but ensure it's the right format
+    return configured_base_url
+
+
 def _normalize_model_tag(model: str) -> str:
     """Normalize model tags by stripping whitespace.
     
@@ -124,6 +178,16 @@ class OllamaClient:
         self.timeout = timeout
         self.session = requests.Session()
         
+        # Disable proxy for local Ollama connections to avoid corporate proxy interference
+        if 'localhost' in base_url or '127.0.0.1' in base_url:
+            self.session.trust_env = False
+            # Also set NO_PROXY environment variable for this session
+            import os
+            os.environ.setdefault('NO_PROXY', 'localhost,127.0.0.1')
+            os.environ.setdefault('no_proxy', 'localhost,127.0.0.1')
+        
+        self.last_error = None  # populated by ping() on failure
+        
         logger.info(f"Initialized OllamaClient with model: {model}, base_url: {base_url}")
     
     def ping(self) -> bool:
@@ -143,22 +207,30 @@ class OllamaClient:
             
             if response.status_code == 200:
                 logger.debug(f"Ping successful: HTTP {response.status_code}")
+                self.last_error = None
                 return True
             else:
                 logger.warning(f"Ping failed: HTTP {response.status_code} - {response.text[:100]}")
+                self.last_error = requests.exceptions.RequestException(
+                    f"HTTP {response.status_code}: {response.text[:200]}"
+                )
                 return False
                 
         except requests.exceptions.ConnectTimeout as e:
             logger.warning(f"Ping failed: Connection timeout after {ping_timeout}s to {self.base_url}")
+            self.last_error = e
             return False
         except requests.exceptions.ConnectionError as e:
             logger.warning(f"Ping failed: Connection error to {self.base_url} - {e}")
+            self.last_error = e
             return False
         except requests.exceptions.Timeout as e:
             logger.warning(f"Ping failed: Request timeout after {ping_timeout}s")
+            self.last_error = e
             return False
         except Exception as e:
             logger.warning(f"Ping failed: Unexpected error - {type(e).__name__}: {e}")
+            self.last_error = e
             return False
     
     def list_models(self) -> List[str]:
@@ -207,20 +279,29 @@ class OllamaClient:
             ValueError: On invalid API response format
         """
         endpoint = f"{self.base_url}/api/generate"
+        # Use effective defaults from client if caller used function defaults
+        effective_temperature = (
+            getattr(self, "default_temperature", temperature)
+            if temperature == 0.1 else temperature
+        )
+        effective_max_tokens = (
+            getattr(self, "default_max_tokens", max_tokens)
+            if max_tokens == 4096 else max_tokens
+        )
         
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens
+                "temperature": effective_temperature,
+                "num_predict": effective_max_tokens
             }
         }
         
         try:
             logger.debug(f"Sending request to Ollama API: {endpoint}")
-            logger.debug(f"Payload: model={self.model}, temperature={temperature}, max_tokens={max_tokens}")
+            logger.debug(f"Payload: model={self.model}, temperature={effective_temperature}, max_tokens={effective_max_tokens}")
             
             response = self.session.post(
                 endpoint,
@@ -309,18 +390,21 @@ def make_llm_client(config: Dict[str, Any]):
     # Handle Ollama provider
     elif provider == "ollama":
         # Resolve Ollama settings with precedence (env > cfg > defaults)
-        base_url = _pick("OLLAMA_BASE_URL", cfg, "base_url", "http://localhost:11434")
-        timeout = int(_pick("OLLAMA_TIMEOUT", cfg, "timeout_s", 60))
-        model = _pick("OLLAMA_MODEL_NAME", cfg, "model", None)
-        backup = _pick("OLLAMA_BACKUP_MODEL", cfg, "backup_model", None)
+        raw_base_url, base_url_source = _pick_with_source("OLLAMA_BASE_URL", cfg, "base_url", "http://localhost:11434")
         
-        # Log effective configuration values
-        logger.info(f"📊 Effective Ollama configuration:")
-        logger.info(f"  • Provider: {provider}")
-        logger.info(f"  • Base URL: {base_url}")
-        logger.info(f"  • Timeout: {timeout}s")
-        logger.info(f"  • Model: {model}")
-        logger.info(f"  • Backup model: {backup}")
+        # Apply adaptive base_url based on runtime environment
+        base_url = _adaptive_base_url(raw_base_url)
+        timeout_str, timeout_source = _pick_with_source("OLLAMA_TIMEOUT", cfg, "timeout_s", 60)
+        timeout = int(timeout_str)
+        model, model_source = _pick_with_source("OLLAMA_MODEL_NAME", cfg, "model", None)
+        backup = _pick("OLLAMA_BACKUP_MODEL", cfg, "backup_model", None)
+        temperature = cfg.get("temperature", 0.1)
+        max_tokens = cfg.get("max_tokens", 4096)
+        
+        # Log effective configuration values (source focuses on base_url per requirement)
+        logger.info(
+            f"Using LLM base_url={base_url}, model={model}, timeout={timeout}s (source: {base_url_source})"
+        )
         
         if model is None:
             raise KeyError("No primary LLM model configured (env OLLAMA_MODEL_NAME or llm.model).")
@@ -333,13 +417,26 @@ def make_llm_client(config: Dict[str, Any]):
         
         # Create provisional client
         client = OllamaClient(model=model, base_url=base_url, timeout=timeout)
+        # Store effective generation defaults on client for later use
+        try:
+            client.default_temperature = float(temperature)
+        except Exception:
+            client.default_temperature = 0.1
+        try:
+            client.default_max_tokens = int(max_tokens)
+        except Exception:
+            client.default_max_tokens = 4096
         
         # Test connectivity BEFORE listing models
         logger.info(f"🔍 Testing connectivity to Ollama server at {base_url}")
         if not client.ping():
-            error_msg = f"Ollama server not accessible at {base_url} (timeout: {timeout}s)"
-            logger.error(error_msg)
-            raise ConnectionError(f"امکان اتصال به سرور Ollama وجود ندارد (آدرس: {base_url})")
+            err = getattr(client, "last_error", None)
+            err_type = type(err).__name__ if err else "UnknownError"
+            logger.error(
+                f"Ollama ping failed: base_url={base_url}, timeout={timeout}s, error_type={err_type}, error={err}"
+            )
+            # Raise Persian-friendly message for end users
+            raise ConnectionError("امکان اتصال به سرور Ollama وجود ندارد")
         
         logger.info(f"✅ Ollama server ping successful")
         
@@ -349,7 +446,10 @@ def make_llm_client(config: Dict[str, Any]):
             available_models = client.list_models()
             available = set(available_models)
             
-            logger.info(f"📋 Found {len(available_models)} models: {', '.join(available_models[:5])}{'...' if len(available_models) > 5 else ''}")
+            logger.info(
+                f"📋 Found {len(available_models)} models: {', '.join(available_models) if len(available_models) <= 20 else ', '.join(available_models[:20]) + '...'}"
+            )
+            logger.info(f"Requested model: {model}")
             
             if model not in available:
                 logger.warning(f"⚠️ Requested model '{model}' not found in available models")
@@ -358,18 +458,16 @@ def make_llm_client(config: Dict[str, Any]):
                         f"🔄 Primary model '{model}' not found. Switching to backup model '{backup}'."
                     )
                     client = OllamaClient(model=backup, base_url=base_url, timeout=timeout)
+                    # Preserve generation defaults
+                    client.default_temperature = float(temperature)
+                    client.default_max_tokens = int(max_tokens)
                     logger.info(f"✅ Successfully switched to backup model: {backup}")
                 else:
                     logger.error(f"❌ Model '{model}' not available")
                     logger.info(f"💡 Suggestion: Run 'ollama pull {model}' or check 'ollama list' for exact tags")
                     
-                    error_msg = f"Requested model '{model}' not found on Ollama server"
-                    if backup:
-                        error_msg += f" and backup model '{backup}' is also not available"
-                    else:
-                        error_msg += " and no backup model configured"
-                    
-                    raise ValueError(f"مدل '{model}' در سرور Ollama یافت نشد و مدل پشتیبان معتبری موجود نیست.")
+                    error_msg = f"مدل '{model}' در سرور Ollama یافت نشد. برای نصب مدل، دستور زیر را اجرا کنید: ollama pull {model}"
+                    raise ValueError(error_msg)
             else:
                 logger.info(f"✅ Model '{model}' verified as available on Ollama server")
                 

@@ -2,9 +2,8 @@
 Health check API routes for the Smart Legal Assistant.
 """
 
-from datetime import datetime
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from datetime import datetime, timezone
+from fastapi import APIRouter
 
 from webapp.core.logging import get_logger
 
@@ -13,93 +12,51 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-class HealthResponse(BaseModel):
-    """Health check response model."""
-    status: str
-    message: str
-    timestamp: datetime
-    version: str = "0.1.0"
-
-
-class DetailedHealthResponse(HealthResponse):
-    """Detailed health check response with system info."""
-    components: dict = {}
-
-
-@router.get("/", response_model=HealthResponse)
+@router.get("/")
 async def health_check():
-    """Basic health check endpoint."""
-    return HealthResponse(
-        status="healthy",
-        message="سامانه پاسخگوی حقوقی هوشمند فعال است",
-        timestamp=datetime.now()
-    )
-
-
-@router.get("/detailed", response_model=DetailedHealthResponse)
-async def detailed_health_check():
-    """Detailed health check with system components status."""
+    """Return structured health diagnostics for the API and RAG engine."""
     try:
         # Import here to avoid circular imports
         from webapp.services.rag_service import get_rag_service
-        from webapp.core.config import get_settings
-        
+        from webapp.core.config import debug_effective_llm, get_settings
+
         settings = get_settings()
         rag_service = get_rag_service()
-        
-        # Check RAG service availability
-        engine_ready = False
-        engine_error = None
-        base_url = "unknown"
-        model = "unknown"
-        vector_store = "unknown"
-        db_path = "unknown"
-        
-        try:
-            engine_ready = rag_service.is_available()
-            
-            # Get effective configuration from engine if available
-            if hasattr(rag_service, '_engine') and rag_service._engine:
-                if hasattr(rag_service._engine, 'llm_client'):
-                    base_url = getattr(rag_service._engine.llm_client, 'base_url', 'unknown')
-                    model = getattr(rag_service._engine.llm_client, 'model', 'unknown')
-                
-                if hasattr(rag_service._engine, 'vector_store') and rag_service._engine.vector_store:
-                    vector_store = rag_service._engine.vector_store.get('type', 'unknown')
-                    
-                if hasattr(rag_service._engine, 'config'):
-                    db_path = rag_service._engine.config.get('database_path', 'unknown')
-                    
-        except Exception as e:
-            engine_error = str(e)
-            logger.warning(f"RAG engine health check failed: {e}")
-        
-        # Determine component statuses
-        components = {
-            "api": "healthy",
-            "rag_engine": "healthy" if engine_ready else "unhealthy",
-            "vector_store": vector_store,
-            "llm_model": model,
-            "base_url": base_url,
-            "database": db_path,
-            "config_path": settings.RAG_CONFIG_PATH
+
+        # Gather diagnostics from service
+        svc_diag = rag_service.get_engine_diagnostics() if hasattr(rag_service, 'get_engine_diagnostics') else {}
+        engine_ready = bool(svc_diag.get("engine_ready", False))
+        model_from_engine = svc_diag.get("model")
+        base_url_from_engine = svc_diag.get("base_url")
+        vector_store = svc_diag.get("vector_store") or "none"
+        db_path = svc_diag.get("db_path")
+
+        # Compute effective LLM settings (ENV > config > default)
+        llm_debug = debug_effective_llm()
+        effective_model = llm_debug.get("model") or model_from_engine
+        effective_base_url = llm_debug.get("base_url") or base_url_from_engine
+
+        status = "ok" if engine_ready else "down"
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        return {
+            "status": status,
+            "engine_ready": engine_ready,
+            "model": effective_model,
+            "base_url": effective_base_url,
+            "vector_store": vector_store or "none",
+            "db_path": db_path,
+            "time": now_iso,
         }
-        
-        if engine_error:
-            components["engine_error"] = engine_error
-        
-        overall_status = "healthy" if engine_ready else "degraded"
-        message = "تمام اجزای سامانه در وضعیت مطلوب قرار دارند" if engine_ready else "برخی از اجزای سامانه مشکل دارند"
-        
-        return DetailedHealthResponse(
-            status=overall_status,
-            message=message,
-            timestamp=datetime.now(),
-            components=components
-        )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail="برخی از اجزای سامانه در دسترس نیستند"
-        )
+        return {
+            "status": "down",
+            "engine_ready": False,
+            "model": None,
+            "base_url": None,
+            "vector_store": "none",
+            "db_path": None,
+            "time": datetime.now(timezone.utc).isoformat(),
+            "message": "سامانه در دسترس نیست. لطفاً اتصال به سرویس‌ها و فایل تنظیمات را بررسی کنید.",
+        }

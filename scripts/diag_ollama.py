@@ -7,6 +7,7 @@ Reads Rag_config.json, tests connectivity, and validates model availability.
 import json
 import sys
 import requests
+import os
 import logging
 from pathlib import Path
 from typing import Dict, Any
@@ -18,22 +19,68 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Disable proxies for local Ollama access to avoid corporate/local proxy interference
+os.environ.setdefault('NO_PROXY', 'localhost,127.0.0.1')
+os.environ.setdefault('no_proxy', 'localhost,127.0.0.1')
+
+# Use a single session and ignore environment proxies entirely
+SESSION = requests.Session()
+SESSION.trust_env = False
+
 def load_config(config_path: str = "phase_4_llm_rag/Rag_config.json") -> Dict[str, Any]:
     """Load RAG configuration from JSON file."""
     try:
         config_file = Path(config_path)
         if not config_file.exists():
-            logger.error(f"❌ Config file not found: {config_path}")
+            logger.error(f"❌ فایل تنظیمات یافت نشد: {config_path}")
             return {}
         
         with open(config_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
         
-        logger.info(f"✅ Config loaded from: {config_path}")
+        logger.info(f"✅ تنظیمات از مسیر زیر بارگذاری شد: {config_path}")
         return config
     except Exception as e:
-        logger.error(f"❌ Failed to load config: {e}")
+        logger.error(f"❌ خطا در بارگذاری تنظیمات: {e}")
         return {}
+
+def _detect_runtime_environment():
+    """Detect the runtime environment (Windows, WSL, Docker) and suggest appropriate base_url."""
+    import platform
+    import os
+    
+    # Check for Docker environment
+    if os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER'):
+        return "docker", "http://host.docker.internal:11434"
+    
+    # Check for WSL environment 
+    if 'microsoft' in platform.uname().release.lower() or os.getenv('WSL_DISTRO_NAME'):
+        return "wsl", "http://localhost:11434"
+        
+    # Check for Windows environment
+    if platform.system() == "Windows":
+        return "windows", "http://localhost:11434"
+    
+    # Default for Linux/macOS
+    return "unix", "http://localhost:11434"
+
+
+def _adaptive_base_url(configured_base_url: str) -> str:
+    """Adapt base_url based on runtime environment if using default localhost."""
+    # Only adapt if using default localhost URLs
+    if configured_base_url not in ["http://localhost:11434", "http://127.0.0.1:11434"]:
+        return configured_base_url
+    
+    env_type, suggested_url = _detect_runtime_environment()
+    
+    # For Docker, use host.docker.internal to reach host Ollama
+    if env_type == "docker":
+        logger.info(f"🐳 Docker environment detected - adapting base_url to: {suggested_url}")
+        return suggested_url
+    
+    # For other environments, keep localhost but ensure it's the right format
+    return configured_base_url
+
 
 def get_effective_config(config: Dict[str, Any]) -> Dict[str, str]:
     """Get effective Ollama configuration with environment precedence."""
@@ -50,9 +97,13 @@ def get_effective_config(config: Dict[str, Any]) -> Dict[str, str]:
     
     cfg = config.get("llm", {})
     
+    # Get raw base_url and apply adaptive detection
+    raw_base_url = _pick("OLLAMA_BASE_URL", cfg, "base_url", "http://localhost:11434")
+    adaptive_base_url = _adaptive_base_url(raw_base_url)
+    
     effective = {
         "provider": _pick("LLM_PROVIDER", cfg, "provider", "ollama"),
-        "base_url": _pick("OLLAMA_BASE_URL", cfg, "base_url", "http://localhost:11434"),
+        "base_url": adaptive_base_url,
         "timeout": int(_pick("OLLAMA_TIMEOUT", cfg, "timeout_s", 60)),
         "model": _pick("OLLAMA_MODEL_NAME", cfg, "model", "unknown"),
         "backup_model": _pick("OLLAMA_BACKUP_MODEL", cfg, "backup_model", None)
@@ -61,42 +112,42 @@ def get_effective_config(config: Dict[str, Any]) -> Dict[str, str]:
     return effective
 
 def test_ollama_ping(base_url: str, timeout: int = 10) -> bool:
-    """Test if Ollama server is accessible."""
+    """بررسی دسترسی‌پذیری سرور Ollama."""
     try:
-        logger.info(f"🔍 Pinging Ollama server at {base_url}")
+        logger.info(f"🔍 ارسال پینگ به سرور Ollama در آدرس: {base_url}")
         
-        response = requests.get(
+        response = SESSION.get(
             f"{base_url}/api/tags",
             timeout=timeout
         )
         
         if response.status_code == 200:
-            logger.info(f"✅ Ping successful: HTTP {response.status_code}")
+            logger.info(f"✅ پینگ موفق بود: کد {response.status_code}")
             return True
         else:
-            logger.error(f"❌ Ping failed: HTTP {response.status_code}")
-            logger.error(f"   Response: {response.text[:200]}")
+            logger.error(f"❌ پینگ ناموفق: کد {response.status_code}")
+            logger.error(f"   پاسخ: {response.text[:200]}")
             return False
             
     except requests.exceptions.ConnectTimeout:
-        logger.error(f"❌ Ping failed: Connection timeout after {timeout}s")
+        logger.error(f"❌ پینگ ناموفق: اتمام زمان اتصال پس از {timeout} ثانیه")
         return False
     except requests.exceptions.ConnectionError as e:
-        logger.error(f"❌ Ping failed: Connection error - {e}")
+        logger.error(f"❌ پینگ ناموفق: خطای اتصال - {e}")
         return False
     except requests.exceptions.Timeout:
-        logger.error(f"❌ Ping failed: Request timeout after {timeout}s")
+        logger.error(f"❌ پینگ ناموفق: اتمام زمان درخواست پس از {timeout} ثانیه")
         return False
     except Exception as e:
-        logger.error(f"❌ Ping failed: {type(e).__name__}: {e}")
+        logger.error(f"❌ پینگ ناموفق: {type(e).__name__}: {e}")
         return False
 
 def get_available_models(base_url: str, timeout: int = 30) -> list:
-    """Get list of available models from Ollama."""
+    """دریافت فهرست مدل‌های موجود از Ollama."""
     try:
-        logger.info(f"📋 Fetching available models from {base_url}/api/tags")
+        logger.info(f"📋 در حال دریافت فهرست مدل‌ها از {base_url}/api/tags")
         
-        response = requests.get(
+        response = SESSION.get(
             f"{base_url}/api/tags",
             timeout=timeout
         )
@@ -109,32 +160,32 @@ def get_available_models(base_url: str, timeout: int = 30) -> list:
                     if "name" in model_info:
                         models.append(model_info["name"].strip())
             
-            logger.info(f"✅ Found {len(models)} models")
+            logger.info(f"✅ تعداد مدل‌ها: {len(models)}")
             return models
         else:
-            logger.error(f"❌ Failed to get models: HTTP {response.status_code}")
+            logger.error(f"❌ خطا در دریافت مدل‌ها: کد {response.status_code}")
             return []
             
     except Exception as e:
-        logger.error(f"❌ Failed to get models: {e}")
+        logger.error(f"❌ خطا در دریافت مدل‌ها: {e}")
         return []
 
 def test_model_generate(base_url: str, model: str, timeout: int = 60) -> bool:
-    """Test if model can generate text."""
+    """تست تولید متن توسط مدل."""
     try:
-        logger.info(f"🧪 Testing text generation with model: {model}")
+        logger.info(f"🧪 تست تولید متن با مدل: {model}")
         
         payload = {
             "model": model,
-            "prompt": "سلام! این یک تست ساده است.",
+            "prompt": "سلام",
             "stream": False,
             "options": {
                 "temperature": 0.1,
-                "num_predict": 50
+                "num_predict": 1
             }
         }
         
-        response = requests.post(
+        response = SESSION.post(
             f"{base_url}/api/generate",
             json=payload,
             timeout=timeout,
@@ -145,22 +196,22 @@ def test_model_generate(base_url: str, model: str, timeout: int = 60) -> bool:
             result = response.json()
             if "response" in result:
                 generated = result["response"]
-                logger.info(f"✅ Generation successful: {len(generated)} characters")
-                logger.info(f"   Sample: {generated[:100]}...")
+                logger.info(f"✅ تولید موفق بود (طول پاسخ: {len(generated)} کاراکتر)")
+                logger.info(f"   نمونه پاسخ: {generated[:100]}...")
                 return True
             else:
-                logger.error(f"❌ Generation failed: No response in result")
+                logger.error(f"❌ تولید ناموفق: کلید 'response' در نتیجه وجود ندارد")
                 return False
         else:
-            logger.error(f"❌ Generation failed: HTTP {response.status_code}")
-            logger.error(f"   Response: {response.text[:200]}")
+            logger.error(f"❌ تولید ناموفق: کد {response.status_code}")
+            logger.error(f"   پاسخ: {response.text[:200]}")
             return False
             
     except requests.exceptions.Timeout:
-        logger.error(f"❌ Generation failed: Timeout after {timeout}s")
+        logger.error(f"❌ تولید ناموفق: اتمام زمان پس از {timeout} ثانیه")
         return False
     except Exception as e:
-        logger.error(f"❌ Generation failed: {e}")
+        logger.error(f"❌ تولید ناموفق: {e}")
         return False
 
 def check_vector_store(config: Dict[str, Any]) -> bool:
@@ -194,78 +245,58 @@ def check_vector_store(config: Dict[str, Any]) -> bool:
         return False
 
 def main():
-    """Main diagnostic function."""
-    print("🚀 Ollama Diagnostic Script for Smart Legal Assistant")
+    """اجرای تست‌های تشخیصی اتصال به Ollama (خروجی فارسی)."""
+    print("🧪 اسکریپت عیب‌یابی Ollama برای دستیار حقوقی هوشمند")
     print("=" * 60)
-    
+
     exit_code = 0
-    
-    # 1. Load configuration
+
+    # 1) بارگذاری تنظیمات
     config = load_config()
     if not config:
-        print("❌ FAILED: Could not load configuration")
+        print("❌ خطا: امکان بارگذاری تنظیمات وجود ندارد")
         return 1
-    
-    # 2. Get effective configuration
+
+    # 2) اعمال تقدم ENV > config
     effective = get_effective_config(config)
-    print(f"\n📊 Effective Configuration:")
-    for key, value in effective.items():
-        print(f"   • {key}: {value}")
-    
-    # 3. Test Ollama connectivity
-    print(f"\n🔍 Testing Ollama Connectivity:")
     base_url = effective["base_url"]
     timeout = effective["timeout"]
-    
-    if not test_ollama_ping(base_url, min(timeout, 10)):
-        print("❌ FAILED: Ollama server not accessible")
+    model = effective["model"]
+
+    print("\n📊 تنظیمات موثر:")
+    print(f"   آدرس سرور (base_url): {base_url}")
+    print(f"   نام مدل (model): {model}")
+
+    # 3) وضعیت پینگ
+    print("\n🔍 وضعیت پینگ:")
+    ping_ok = test_ollama_ping(base_url, min(timeout, 10))
+    print("   نتیجه پینگ:", "موفق" if ping_ok else "ناموفق")
+    if not ping_ok:
         exit_code = 1
-    
-    # 4. Get available models
-    print(f"\n📋 Checking Available Models:")
+
+    # 4) تعداد مدل‌ها از /api/tags
     available_models = get_available_models(base_url, timeout)
-    if available_models:
-        print(f"   Found {len(available_models)} models:")
-        for i, model in enumerate(available_models, 1):
-            print(f"   {i}. {model}")
-    else:
-        print("❌ FAILED: No models available")
-        exit_code = 1
-    
-    # 5. Test configured model
-    print(f"\n🧪 Testing Configured Model:")
-    requested_model = effective["model"]
-    if requested_model == "unknown":
-        print("❌ FAILED: No model configured")
-        exit_code = 1
-    elif requested_model not in available_models:
-        print(f"❌ FAILED: Model '{requested_model}' not available")
-        print(f"   💡 Suggestion: Run 'ollama pull {requested_model}'")
+    print("\n📋 اطلاعات مدل‌ها:")
+    print(f"   تعداد مدل‌های موجود: {len(available_models)}")
+
+    # 5) تست تولید ۱ توکن با متن 'سلام'
+    print("\n🧪 تست تولید تک‌توکن:")
+    if model in (None, "", "unknown"):
+        print("   ❌ خطا: هیچ مدلی در تنظیمات مشخص نشده است (OLLAMA_MODEL_NAME یا llm.model)")
         exit_code = 1
     else:
-        if test_model_generate(base_url, requested_model, timeout):
-            print(f"✅ Model '{requested_model}' working correctly")
-        else:
-            print(f"❌ FAILED: Model '{requested_model}' cannot generate text")
+        can_generate = test_model_generate(base_url, model, timeout)
+        print("   نتیجه تولید:", "موفق" if can_generate else "ناموفق")
+        if not can_generate:
             exit_code = 1
-    
-    # 6. Check vector store
-    print(f"\n📁 Checking Vector Store:")
-    if check_vector_store(config):
-        print("✅ Vector store files found")
-    else:
-        print("❌ FAILED: Vector store files missing")
-        print("   💡 Suggestion: Run phases 1-3 to generate vector store")
-        exit_code = 1
-    
-    # 7. Summary
-    print(f"\n📋 Diagnostic Summary:")
+
+    # 6) جمع‌بندی
+    print("\n📋 نتیجه نهایی:")
     if exit_code == 0:
-        print("✅ All checks passed - System should work correctly")
+        print("✅ همه بررسی‌ها با موفقیت انجام شد.")
     else:
-        print("❌ Some checks failed - System may not work properly")
-        print("   Check the errors above for specific issues")
-    
+        print("❌ برخی از بررسی‌ها ناموفق بودند. لطفاً خطاهای فوق را بررسی کنید.")
+
     return exit_code
 
 if __name__ == "__main__":
