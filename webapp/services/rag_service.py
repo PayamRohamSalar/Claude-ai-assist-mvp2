@@ -40,6 +40,8 @@ class RAGService:
         self._engine = None
         self._settings = get_settings()
         self._engine_loaded = False
+        self._engine_ready = False
+        self._last_error = None
     
     def _load_engine(self) -> None:
         """Load the Legal RAG Engine once."""
@@ -65,6 +67,9 @@ class RAGService:
                 from phase_4_llm_rag.rag_engine import LegalRAGEngine
                 self._engine = LegalRAGEngine()
                 logger.info(f"[{trace_id}] RAG engine loaded successfully")
+                
+                # Test if engine is ready with a lightweight ping
+                self._test_engine_readiness(trace_id)
                 
             except ImportError as e:
                 raise ServiceError(
@@ -99,13 +104,46 @@ class RAGService:
             self._engine_loaded = True
             
         except ServiceError:
-            # Re-raise ServiceError as-is
+            # Re-raise ServiceError as-is but cache error info
+            self._last_error = str(e)
             raise
         except Exception as e:
             logger.error(f"[{trace_id}] Unexpected error loading RAG engine: {str(e)}")
+            self._last_error = str(e)
             raise ServiceError(
                 user_message="خطای غیرمنتظره در راه‌اندازی سیستم. لطفاً مجدداً تلاش کنید.",
                 technical_details=f"Unexpected error: {str(e)}",
+                trace_id=trace_id
+            )
+    
+    def _test_engine_readiness(self, trace_id: str) -> None:
+        """Test if the RAG engine is ready to process queries."""
+        try:
+            # Test if LLM client can ping Ollama
+            if hasattr(self._engine, 'llm_client') and hasattr(self._engine.llm_client, 'ping'):
+                logger.info(f"[{trace_id}] Testing LLM client connectivity...")
+                if not self._engine.llm_client.ping():
+                    raise ServiceError(
+                        user_message="خطا در تولید پاسخ: امکان اتصال به سرور Ollama وجود ندارد",
+                        technical_details=f"Ollama ping failed for base_url: {getattr(self._engine.llm_client, 'base_url', 'unknown')}",
+                        trace_id=trace_id
+                    )
+                logger.info(f"[{trace_id}] ✅ LLM client connectivity test passed")
+            
+            # Test if vector store is accessible
+            if hasattr(self._engine, 'vector_store') and self._engine.vector_store:
+                logger.info(f"[{trace_id}] Vector store loaded: {self._engine.vector_store.get('type', 'unknown')}")
+            
+            self._engine_ready = True
+            logger.info(f"[{trace_id}] ✅ RAG engine readiness check passed")
+            
+        except ServiceError:
+            raise
+        except Exception as e:
+            logger.warning(f"[{trace_id}] Engine readiness test failed: {e}")
+            raise ServiceError(
+                user_message="خطا در آماده‌سازی سیستم: سرویس‌های مورد نیاز در دسترس نیستند",
+                technical_details=f"Engine readiness test failed: {str(e)}",
                 trace_id=trace_id
             )
     
@@ -125,15 +163,24 @@ class RAGService:
             ServiceError: When engine is unavailable or processing fails
         """
         trace_id = str(uuid.uuid4())
+        import time
+        start_time = time.time()
         
         try:
-            # Ensure engine is loaded
+            # Ensure engine is loaded and ready
             self._load_engine()
             
             if self._engine is None:
                 raise ServiceError(
                     user_message="خطای داخلی: موتور جستجو در دسترس نیست.",
                     technical_details="RAG engine is None after loading",
+                    trace_id=trace_id
+                )
+            
+            if not self._engine_ready:
+                raise ServiceError(
+                    user_message="خطای سیستم: موتور جستجو آماده نیست. لطفاً با پشتیبانی تماس بگیرید.",
+                    technical_details=f"RAG engine not ready. Last error: {self._last_error}",
                     trace_id=trace_id
                 )
             
@@ -153,7 +200,8 @@ class RAGService:
                 "citations": self._normalize_citations(result.get("citations", []))
             }
             
-            logger.info(f"[{trace_id}] Successfully processed question, got {len(normalized_result['citations'])} citations")
+            processing_time = time.time() - start_time
+            logger.info(f"[{trace_id}] Successfully processed question in {processing_time:.2f}s, got {len(normalized_result['citations'])} citations")
             
             return normalized_result
             
@@ -163,10 +211,16 @@ class RAGService:
         except Exception as e:
             logger.error(f"[{trace_id}] Error processing question: {str(e)}")
             
-            # Check for specific runtime errors
+            # Check for specific runtime errors with better Persian messages
             error_msg = str(e).lower()
             
-            if "connection" in error_msg or "timeout" in error_msg:
+            if "امکان اتصال به سرور ollama وجود ندارد" in str(e):
+                raise ServiceError(
+                    user_message="خطا در تولید پاسخ: امکان اتصال به سرور Ollama وجود ندارد",
+                    technical_details=f"Ollama connection error: {str(e)}",
+                    trace_id=trace_id
+                )
+            elif "connection" in error_msg or "timeout" in error_msg:
                 raise ServiceError(
                     user_message="خطا در ارتباط: اتصال به سرویس‌ها قطع شده است. لطفاً مجدداً تلاش کنید.",
                     technical_details=f"Connection error during processing: {str(e)}",

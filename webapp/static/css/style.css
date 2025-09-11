@@ -1,8 +1,112 @@
-/* Smart Legal Assistant - Web UI Styles */
-/* This file can be used for custom styling beyond Bootstrap */
+/* Smart Legal Assistant - Web UI Styles (Lightweight, RTL-friendly) */
 
+/* Typography & base */
+html { direction: rtl; }
 body {
-    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    font-family: Vazirmatn, Tahoma, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.85;
+    color: #0f172a;
+    background-color: #f6f7fb;
+    margin: 0;
 }
 
-/* Custom styles will be added here as needed */
+/* Max-width container */
+.container {
+    max-width: 1100px;
+    margin-inline: auto;
+    padding: 0 16px;
+}
+
+/* Forms */
+textarea,
+select,
+input[type="text"],
+button {
+    font: inherit;
+}
+
+textarea {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e6e8f0;
+    background: #fff;
+    outline: none;
+}
+
+label { display: inline-block; margin-bottom: 6px; }
+
+select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #e6e8f0;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.form-row { display: grid; gap: 10px; margin-bottom: 12px; }
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid #e6e8f0;
+    background: #fff;
+    color: #0f172a;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+}
+
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Answer box */
+#answer,
+.answer-box {
+    background: #fff;
+    border: 1px solid #e6e8f0;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 10px 30px rgba(2, 6, 23, .06);
+}
+
+.answer-box h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.answer-text { white-space: pre-wrap; }
+
+/* Citation list with bracketed numbers */
+.citations { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e6e8f0; }
+.citations h4 { margin: 0 0 8px; font-size: .98rem; opacity: .9; }
+.citations ol {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: grid; gap: 6px;
+}
+.citations ol li {
+    position: relative;
+    padding-inline-start: 28px;
+}
+.citations ol li::before {
+    content: attr(data-index);
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    transform: translateY(2px);
+    color: #334155;
+}
+
+/* Utility */
+.muted { opacity: .75; }
+.card { background: #fff; border: 1px solid #e6e8f0; border-radius: 14px; padding: 12px; }
+

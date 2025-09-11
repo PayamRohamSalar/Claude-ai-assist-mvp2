@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}دستیار هوشمند حقوقی{% endblock %}</title>
+
+  <!-- Font: Vazirmatn -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.003/dist/font-face.css" rel="stylesheet">
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  {% block extra_head %}{% endblock %}
+
+  <!-- Minimal critical styles (scoped) to ensure a polished baseline -->
+  <style>
+    :root {
+      --app-bg: #0b1020;
+      --app-card: #ffffff;
+      --app-muted: #f6f7fb;
+      --app-text: #0f172a;
+      --app-accent: #3b82f6;
+      --app-accent-2: #8b5cf6;
+      --app-border: #e6e8f0;
+      --app-success: #10b981;
+      --app-danger: #ef4444;
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(2, 6, 23, .10);
+      --maxw: 1100px;
+      --sidebar-w: 320px;
+    }
+    html, body {height: 100%;}
+    body {
+      margin: 0; font-family: Vazirmatn, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1000px 700px at 80% -10%, rgba(59,130,246,.35), transparent 60%),
+                  radial-gradient(800px 600px at 10% -20%, rgba(139,92,246,.25), transparent 60%),
+                  #0f172a;
+      color: var(--app-text);
+    }
+    .app-header {
+      position: sticky; top: 0; z-index: 50;
+      background: linear-gradient(90deg, rgba(59,130,246,.95), rgba(139,92,246,.95));
+      color: #fff;
+      backdrop-filter: saturate(130%) blur(10px);
+      box-shadow: 0 1px 0 rgba(255,255,255,.08) inset;
+    }
+    .app-header__inner {
+      max-width: var(--maxw); margin: 0 auto; padding: 14px 20px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .app-logo {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: rgba(255,255,255,.2);
+      display: grid; place-items: center;
+    }
+    .app-title {font-weight: 700; letter-spacing: .2px;}
+    .app-subtle {opacity: .85; font-weight: 400; font-size: .92rem;}
+
+    .app-main {
+      max-width: var(--maxw); margin: 16px auto 92px; padding: 0 16px;
+      display: grid; grid-template-columns: minmax(0,1fr); gap: 16px;
+    }
+    @media (min-width: 992px) {
+      .app-main { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+    }
+
+    .app-controls {
+      background: var(--app-card); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 14px; border: 1px solid var(--app-border);
+      position: sticky; top: 90px; height: fit-content;
+    }
+    .app-controls h3 {margin: 6px 0 10px; font-size: 1rem;}
+    .app-controls .row {display: grid; gap: 10px; margin-bottom: 10px;}
+    .app-controls label {font-size: .92rem; opacity: .9;}
+    .app-controls select, .app-controls input[type="checkbox"] {
+      width: 100%; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--app-border);
+      background: #fff; font: inherit;
+    }
+
+    .app-chat {
+      background: var(--app-card); border-radius: var(--radius); box-shadow: var(--shadow);
+      border: 1px solid var(--app-border);
+      padding: 0; overflow: clip;
+    }
+    .chat-head {
+      padding: 12px 16px; border-bottom: 1px solid var(--app-border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chat-feed {
+      padding: 16px; display: flex; flex-direction: column; gap: 14px; min-height: 40vh;
+      background: linear-gradient(180deg, var(--app-muted), #fff);
+    }
+    .msg {display: grid; gap: 8px; max-width: 90%;}
+    .msg .bubble {
+      border-radius: 18px; padding: 12px 14px; line-height: 1.85; border: 1px solid var(--app-border);
+      background: #fff;
+    }
+    .msg.assistant {justify-items: start;}
+    .msg.assistant .bubble {background: #ffffff; box-shadow: var(--shadow);}
+    .msg.user {justify-items: end; margin-right: 12px;}
+    .msg.user .bubble {background: #eef2ff; border-color: #dbeafe;}
+
+    .meta {font-size: .82rem; opacity: .75;}
+    .cite {
+      margin-top: 8px; padding: 10px; background: #fafafa; border: 1px dashed var(--app-border); border-radius: 12px;
+      font-size: .9rem;
+    }
+    pre, code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      white-space: pre-wrap; word-wrap: break-word;
+      background: #0b1220; color: #e6edf3; padding: 10px 12px; border-radius: 12px;
+      overflow-x: auto;
+    }
+
+    .app-composer {
+      position: fixed; inset-inline: 0; bottom: 0; z-index: 60;
+      background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.9) 18%, rgba(255,255,255,1) 42%);
+      border-top: 1px solid var(--app-border);
+    }
+    .composer-inner {
+      max-width: var(--maxw); margin: 0 auto; padding: 10px 16px;
+      display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end;
+    }
+    .composer-box {
+      background: var(--app-card); border-radius: 16px; border: 1px solid var(--app-border);
+      padding: 8px; display: grid; gap: 8px; box-shadow: var(--shadow);
+    }
+    textarea#question-input {
+      width: 100%; min-height: 60px; max-height: 200px; resize: vertical; border: none; outline: none;
+      font: inherit; line-height: 1.9; padding: 6px 8px; background: transparent;
+    }
+    .composer-actions {display: flex; gap: 8px;}
+    .btn {
+      padding: 10px 14px; border-radius: 12px; border: 1px solid var(--app-border); background: #fff;
+      font-weight: 600; cursor: pointer;
+    }
+    .btn-primary { background: var(--app-accent); color: #fff; border-color: var(--app-accent); }
+    .btn-primary:hover { filter: brightness(.97); }
+    .hint {font-size: .84rem; opacity: .75; margin-top: -6px;}
+
+    .toast {
+      position: fixed; bottom: 110px; inset-inline-start: 50%; transform: translateX(-50%);
+      background: #111827; color: #fff; padding: 10px 14px; border-radius: 12px; box-shadow: var(--shadow);
+      font-size: .9rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="app-header" role="banner">
+    <div class="app-header__inner">
+      <div class="app-logo" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M3 11h18v2H3zM11 3h2v18h-2z"/></svg>
+      </div>
+      <div>
+        <div class="app-title">دستیار حقوقی هوشمند</div>
+        <div class="app-subtle">پرسش، پاسخ مستند، و منابع قابل اتکا</div>
+      </div>
+      <div style="margin-inline-start:auto" class="app-subtle">v0.1.0</div>
+    </div>
+  </header>
+
+  <main class="app-main" role="main">
+    <!-- Sidebar controls (keep all existing options here) -->
+    <aside class="app-controls" aria-label="تنظیمات پرسش">
+      <h3>تنظیمات</h3>
+      {% block controls %}
+        <!-- The page (index.html) will inject selects like: نوع پرسش/Template, تعداد منابع/Top-K, Show Sources checkbox, etc. -->
+      {% endblock %}
+    </aside>
+
+    <!-- Chat area -->
+    <section class="app-chat" aria-live="polite">
+      <div class="chat-head">
+        <div class="app-subtle">گفتگو</div>
+        <div class="app-subtle" id="latency-indicator" aria-live="polite"></div>
+      </div>
+      <div id="chat-feed" class="chat-feed">
+        {% block content %}
+          <!-- The page will insert message bubbles here -->
+          <!-- Sample structure:
+          <div class="msg user">
+            <div class="bubble">سلام! شرایط ارتقا اعضای هیئت علمی چیست؟</div>
+            <div class="meta">شما • الان</div>
+          </div>
+          <div class="msg assistant">
+            <div class="bubble">پاسخ دستیار …</div>
+            <div class="cite">منابع: …</div>
+            <div class="meta">دستیار • 2.1 ثانیه</div>
+          </div>
+          -->
+        {% endblock %}
+      </div>
+    </section>
+  </main>
+
+  <!-- Sticky composer -->
+  <footer class="app-composer">
+    <div class="composer-inner">
+      {% block composer %}
+      <form id="composer-form" class="composer-box">
+        <textarea id="question-input" name="question" placeholder="سوال خود را اینجا بنویسید..." aria-label="نوشتن سوال" required></textarea>
+        <div class="composer-actions">
+          <button type="submit" class="btn btn-primary" aria-label="ارسال سوال">
+            ارسال
+          </button>
+        </div>
+      </form>
+      {% endblock %}
+    </div>
+  </footer>
+
+  <div id="toast" class="toast" style="display: none;" aria-live="polite" role="status"></div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

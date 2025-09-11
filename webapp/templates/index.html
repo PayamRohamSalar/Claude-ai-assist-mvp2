@@ -184,74 +184,8 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- Custom JS -->
-    <script>
-        document.getElementById('questionForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const form = e.target;
-            const formData = new FormData(form);
-            const questionData = Object.fromEntries(formData);
-            
-            // Show loading state
-            const btn = form.querySelector('.ask-btn');
-            const btnText = btn.querySelector('.btn-text');
-            const spinner = btn.querySelector('.loading-spinner');
-            const answerSection = document.getElementById('answerSection');
-            const errorSection = document.getElementById('errorSection');
-            
-            btn.disabled = true;
-            btnText.textContent = 'در حال پردازش...';
-            spinner.style.display = 'inline-block';
-            answerSection.classList.add('d-none');
-            errorSection.classList.add('d-none');
-            
-            try {
-                const response = await fetch('/api/ask', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(questionData)
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    // Show answer
-                    document.getElementById('answerContent').innerHTML = result.answer.replace(/\n/g, '<br>');
-                    
-                    // Show citations
-                    const citationsHtml = result.citations.length > 0 
-                        ? '<h6 class="text-secondary mb-2">📖 منابع:</h6><ul class="list-unstyled">' +
-                          result.citations.map((c, i) => 
-                            `<li class="mb-1"><small>[${i+1}] ${c.document_title || 'سند نامشخص'} - ماده ${c.article_number || 'نامشخص'}</small></li>`
-                          ).join('') + '</ul>'
-                        : '';
-                    document.getElementById('citationsContent').innerHTML = citationsHtml;
-                    
-                    // Show meta info
-                    document.getElementById('metaInfo').textContent = 
-                        `${result.retrieved_chunks} سند بازیابی شده | زمان پردازش: ${result.processing_time.toFixed(2)} ثانیه`;
-                    
-                    answerSection.classList.remove('d-none');
-                } else {
-                    // Show error
-                    document.getElementById('errorContent').textContent = result.detail?.message || result.detail || 'خطای نامشخص';
-                    errorSection.classList.remove('d-none');
-                }
-            } catch (error) {
-                // Show network error
-                document.getElementById('errorContent').textContent = 'خطا در ارتباط با سرور. لطفاً مجدداً تلاش کنید.';
-                errorSection.classList.remove('d-none');
-            } finally {
-                // Reset button state
-                btn.disabled = false;
-                btnText.textContent = '🔍 پرسش از دستیار';
-                spinner.style.display = 'none';
-            }
-        });
-    </script>
+    <script src="/static/js/main.js"></script>
 </body>
 </html>

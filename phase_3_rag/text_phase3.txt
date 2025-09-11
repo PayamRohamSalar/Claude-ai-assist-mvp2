@@ -4,3 +4,7 @@ pip install sentence-transformers
 python phase_3_rag\embedding_generator.py
 
 python tests\test_phase_3.py
+
+
+# run Phases 1 to 3
+python pipeline\run_phases_1_to_3.py

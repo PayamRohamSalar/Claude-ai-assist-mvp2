@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block title %}پاسخ سوال - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="answer-box" id="answer">
+        <h3>پاسخ:</h3>
+        <div class="answer-text">
+            {% if answer %}
+                {{ answer | safe }}
+            {% else %}
+                <p class="muted">هیچ پاسخی دریافت نشده است.</p>
+            {% endif %}
+        </div>
+
+        {% if citations and citations | length > 0 %}
+        <div class="citations">
+            <h4>منابع:</h4>
+            <ol>
+                {% for citation in citations %}
+                <li data-index="[{{ loop.index }}]">
+                    {% if citation.document_title %}
+                        <strong>{{ citation.document_title }}</strong>
+                    {% endif %}
+                    {% if citation.article_number %}
+                        (ماده {{ citation.article_number }})
+                    {% endif %}
+                    {% if citation.note_label %}
+                        {{ citation.note_label }}
+                    {% endif %}
+                    {% if citation.link %}
+                        <a href="{{ citation.link }}" target="_blank" rel="noopener noreferrer">[مشاهده]</a>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 20px; text-align: center;">
+        <a href="/" class="btn">پرسش جدید</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Optional: Add any client-side enhancements for the answer page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Answer page loaded');
+
+    // Auto-scroll citations into view if hash is present
+    if (window.location.hash) {
+        const element = document.querySelector(window.location.hash);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    // Add click tracking for citation links
+    document.querySelectorAll('.citations a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            console.log('Citation link clicked:', this.href);
+        });
+    });
+});
+</script>
+{% endblock %}

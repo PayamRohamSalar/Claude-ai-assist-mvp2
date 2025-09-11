@@ -133,13 +133,32 @@ class OllamaClient:
             True if server responds to /api/tags, False otherwise
         """
         try:
+            ping_timeout = min(self.timeout, 10)  # Use shorter timeout for ping
+            logger.debug(f"Pinging Ollama server at {self.base_url} (timeout: {ping_timeout}s)")
+            
             response = self.session.get(
                 f"{self.base_url}/api/tags",
-                timeout=min(self.timeout, 10)  # Use shorter timeout for ping
+                timeout=ping_timeout
             )
-            return response.status_code == 200
+            
+            if response.status_code == 200:
+                logger.debug(f"Ping successful: HTTP {response.status_code}")
+                return True
+            else:
+                logger.warning(f"Ping failed: HTTP {response.status_code} - {response.text[:100]}")
+                return False
+                
+        except requests.exceptions.ConnectTimeout as e:
+            logger.warning(f"Ping failed: Connection timeout after {ping_timeout}s to {self.base_url}")
+            return False
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"Ping failed: Connection error to {self.base_url} - {e}")
+            return False
+        except requests.exceptions.Timeout as e:
+            logger.warning(f"Ping failed: Request timeout after {ping_timeout}s")
+            return False
         except Exception as e:
-            logger.debug(f"Ollama server ping failed: {e}")
+            logger.warning(f"Ping failed: Unexpected error - {type(e).__name__}: {e}")
             return False
     
     def list_models(self) -> List[str]:
@@ -274,6 +293,7 @@ def make_llm_client(config: Dict[str, Any]):
         NotImplementedError: If provider is not supported
         KeyError: If no primary model is configured (for non-fake providers)
         ValueError: If requested model is not available and no valid backup
+        ConnectionError: If Ollama server is not accessible
     """
     cfg = config.get("llm", {})
     
@@ -294,6 +314,14 @@ def make_llm_client(config: Dict[str, Any]):
         model = _pick("OLLAMA_MODEL_NAME", cfg, "model", None)
         backup = _pick("OLLAMA_BACKUP_MODEL", cfg, "backup_model", None)
         
+        # Log effective configuration values
+        logger.info(f"📊 Effective Ollama configuration:")
+        logger.info(f"  • Provider: {provider}")
+        logger.info(f"  • Base URL: {base_url}")
+        logger.info(f"  • Timeout: {timeout}s")
+        logger.info(f"  • Model: {model}")
+        logger.info(f"  • Backup model: {backup}")
+        
         if model is None:
             raise KeyError("No primary LLM model configured (env OLLAMA_MODEL_NAME or llm.model).")
         
@@ -301,35 +329,49 @@ def make_llm_client(config: Dict[str, Any]):
         model = _normalize_model_tag(model)
         backup = _normalize_model_tag(backup) if backup else None
         
-        logger.info(f"Creating Ollama client for model: {model}")
+        logger.info(f"🔧 Creating Ollama client for model: {model}")
         
         # Create provisional client
         client = OllamaClient(model=model, base_url=base_url, timeout=timeout)
         
+        # Test connectivity BEFORE listing models
+        logger.info(f"🔍 Testing connectivity to Ollama server at {base_url}")
+        if not client.ping():
+            error_msg = f"Ollama server not accessible at {base_url} (timeout: {timeout}s)"
+            logger.error(error_msg)
+            raise ConnectionError(f"امکان اتصال به سرور Ollama وجود ندارد (آدرس: {base_url})")
+        
+        logger.info(f"✅ Ollama server ping successful")
+        
         # Validate model availability
         try:
+            logger.info(f"📋 Listing available models...")
             available_models = client.list_models()
             available = set(available_models)
             
-            logger.debug(f"Available models: {available_models}")
+            logger.info(f"📋 Found {len(available_models)} models: {', '.join(available_models[:5])}{'...' if len(available_models) > 5 else ''}")
             
             if model not in available:
+                logger.warning(f"⚠️ Requested model '{model}' not found in available models")
                 if backup and backup in available:
                     logger.warning(
-                        f"Primary model '{model}' not found. Switching to backup model '{backup}'."
+                        f"🔄 Primary model '{model}' not found. Switching to backup model '{backup}'."
                     )
                     client = OllamaClient(model=backup, base_url=base_url, timeout=timeout)
+                    logger.info(f"✅ Successfully switched to backup model: {backup}")
                 else:
+                    logger.error(f"❌ Model '{model}' not available")
+                    logger.info(f"💡 Suggestion: Run 'ollama pull {model}' or check 'ollama list' for exact tags")
+                    
                     error_msg = f"Requested model '{model}' not found on Ollama server"
                     if backup:
                         error_msg += f" and backup model '{backup}' is also not available"
                     else:
                         error_msg += " and no backup model configured"
                     
-                    logger.error(error_msg)
                     raise ValueError(f"مدل '{model}' در سرور Ollama یافت نشد و مدل پشتیبان معتبری موجود نیست.")
             else:
-                logger.info(f"Model '{model}' verified as available on Ollama server")
+                logger.info(f"✅ Model '{model}' verified as available on Ollama server")
                 
         except Exception as e:
             if "not found" in str(e).lower() or "available" in str(e).lower():
@@ -337,7 +379,7 @@ def make_llm_client(config: Dict[str, Any]):
                 raise
             else:
                 # Log other errors but don't fail - server might still work
-                logger.warning(f"Could not verify model availability: {e}")
+                logger.warning(f"⚠️ Could not verify model availability: {e}")
         
         return client
     
