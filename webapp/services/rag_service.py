@@ -5,6 +5,7 @@ Handles loading and interfacing with the Legal RAG Engine.
 
 import uuid
 from typing import Dict, List, Optional, Any
+import re
 from pathlib import Path
 
 from webapp.core.config import get_settings
@@ -201,7 +202,7 @@ class RAGService:
                 top_k=top_k,
                 template_name=template
             )
-            
+
             # Detect connectivity errors bubbled up as text from underlying engine
             answer_text_for_check = str(result.get("answer", ""))
             if "امکان اتصال به سرور Ollama وجود ندارد" in answer_text_for_check:
@@ -214,16 +215,29 @@ class RAGService:
                     trace_id=trace_id
                 )
 
-            # Process and normalize the result
-            normalized_result = {
-                "answer": result.get("answer", "پاسخی دریافت نشد."),
-                "citations": self._normalize_citations(result.get("citations", []))
-            }
-            
+            # Final defensive cleanup of the answer text
+            text = re.sub(r"\(([0-9a-f]{8,})\)", "", result.get("answer", ""), flags=re.I)
+            text = re.sub(r"\s{2,}", " ", text).strip()
+
+            # Pass-through normalized citations
+            citations = [
+                {
+                    "document_uid": c.get("document_uid"),
+                    "title": c.get("title"),
+                    "article_number": c.get("article_number"),
+                    "note_label": c.get("note_label"),
+                    "link": c.get("link")
+                }
+                for c in result.get("citations", [])
+            ]
+
             processing_time = time.time() - start_time
-            logger.info(f"[{trace_id}] Successfully processed question in {processing_time:.2f}s, got {len(normalized_result['citations'])} citations")
-            
-            return normalized_result
+            logger.info(f"[{trace_id}] Successfully processed question in {processing_time:.2f}s, got {len(citations)} citations")
+
+            return {
+                "answer": text,
+                "citations": citations
+            }
             
         except ServiceError:
             # Re-raise ServiceError as-is

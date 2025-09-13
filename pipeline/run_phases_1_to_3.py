@@ -11,16 +11,22 @@ Version: 1.0.0
 """
 
 import argparse
+import hashlib
 import json
 import logging
+import os
+import zipfile
+import xml.etree.ElementTree as ET
 import shutil
 import sqlite3
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Literal, Tuple
+from typing import Dict, List, Any, Optional, Literal, Tuple, Iterable, Set
 
 # Add parent directory for imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -29,6 +35,36 @@ sys.path.append(str(Path(__file__).parent.parent))
 from phase_1_data_processing.main_processor import Phase1Processor
 from phase_2_database.database_creator import init_database
 from phase_2_database.data_importer import process_single_document, ImportStats
+
+# Reuse helpers from Phase 3 chunker where possible
+from phase_3_rag.chunker import (
+    load_chunking_config,
+    normalize_text as chunk_normalize_text,
+    split_text_into_chunks,
+    compute_chunk_uid,
+    estimate_token_count,
+)
+
+# Text/metadata extraction on raw files
+from shared_utils.file_utils import DocumentReader
+from phase_1_data_processing.metadata_extractor import PersianMetadataExtractor
+
+try:
+    import numpy as np
+except Exception:
+    np = None  # Will validate at runtime if embeddings are requested
+
+try:
+    from sentence_transformers import SentenceTransformer
+except Exception:
+    SentenceTransformer = None  # Optional until embeddings step
+
+try:
+    import faiss
+    HAS_FAISS = True
+except Exception:
+    faiss = None
+    HAS_FAISS = False
 
 # Simple logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -73,6 +109,12 @@ class PhasesPipeline:
         self.start_time = None
         self.errors: List[str] = []
         self.artifacts: List[str] = []
+        
+        # Incremental processing state
+        self.embedding_model_name = (
+            self.config.get("rag", {}).get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2")
+        )
+        self.vector_db_dir = self.phase3_dir / "vector_db" / "faiss"
         
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from JSON file."""
@@ -198,6 +240,406 @@ class PhasesPipeline:
             }
             
             return report
+
+    # =============== Incremental multi-file processing ===============
+    def run_incremental(
+        self,
+        raw_dir: Path,
+        force: bool = False,
+        workers: int = 1,
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Incrementally process .docx files end-to-end: text->normalize->chunk->embed->FAISS->SQLite.
+        """
+        start_ts = time.time()
+        raw_dir = Path(raw_dir)
+        self.logger.info(f"Raw dir: {str(raw_dir.resolve())}")
+        self.logger.info(f"Phase3 dir: {str(self.phase3_dir.resolve())}")
+        self.logger.info(f"DB path: {str(self.db_path.resolve())}")
+        self.logger.info(f"Vector DB dir: {str(self.vector_db_dir.resolve())}")
+
+        self.phase3_dir.mkdir(parents=True, exist_ok=True)
+        (self.phase3_dir / "chunks_by_doc").mkdir(parents=True, exist_ok=True)
+        self.vector_db_dir.mkdir(parents=True, exist_ok=True)
+
+        existing_doc_uids: Set[str] = self._load_existing_document_uids()
+
+        doc_paths = sorted(raw_dir.glob("*.docx"))
+        if not doc_paths:
+            self.logger.info("هیچ فایل DOCX برای پردازش یافت نشد")
+            return {
+                "success": True,
+                "processed_docs": 0,
+                "processed_chunks": 0,
+                "updated_chunks": 0,
+                "duration_seconds": round(time.time() - start_ts, 2),
+            }
+
+        # Stage 1: per-file text+metadata+chunking (parallelizable)
+        per_doc_results: List[Dict[str, Any]] = []
+
+        def _process_one(file_path: Path) -> Dict[str, Any]:
+            t0 = time.time()
+            document_uid = self._compute_document_uid(file_path)
+            skipped = False
+            was_update = document_uid in existing_doc_uids
+            prev_count = 0
+            if (not force) and was_update:
+                skipped = True
+                return {
+                    "document_uid": document_uid,
+                    "file": str(file_path),
+                    "chunks": [],
+                    "skipped": True,
+                    "was_update": was_update,
+                    "prev_count": 0,
+                    "elapsed": round(time.time() - t0, 3),
+                }
+
+            # Extract text
+            reader = DocumentReader()
+            r = reader.read_document(file_path)
+            if not r.get("success"):
+                # Fallback for DOCX when python-docx not available
+                if file_path.suffix.lower() == ".docx" and "docx" in str(r.get("error", "")).lower():
+                    text = self._read_docx_fallback(file_path)
+                else:
+                    raise PipelineError(f"Read failure: {r.get('error')}")
+            else:
+                text = (r.get("content") or "").strip()
+            if not text:
+                return {
+                    "document_uid": document_uid,
+                    "file": str(file_path),
+                    "chunks": [],
+                    "skipped": True,
+                    "prev_count": 0,
+                    "elapsed": round(time.time() - t0, 3),
+                }
+
+            # Metadata
+            meta_extractor = PersianMetadataExtractor()
+            md = meta_extractor.extract_metadata(text, document_id=document_uid)
+            title = md.title or file_path.stem
+
+            # Normalize and chunk
+            cfg = load_chunking_config()
+            normalized_all = chunk_normalize_text(text, cfg)
+            raw_chunks = split_text_into_chunks(normalized_all, cfg)
+
+            chunks: List[Dict[str, Any]] = []
+            for idx, chunk_text in enumerate(raw_chunks):
+                norm = chunk_normalize_text(chunk_text, cfg)
+                uid = compute_chunk_uid(
+                    document_uid=document_uid,
+                    article_number="NA",
+                    note_label="NA",
+                    chunk_index=idx,
+                    normalized_text=norm,
+                )
+                chunks.append({
+                    "chunk_uid": uid,
+                    "document_uid": document_uid,
+                    "document_title": title,
+                    "document_type": md.document_type or "",
+                    "section": md.section_label or "",
+                    "approval_date": md.approval_date or "",
+                    "approval_authority": md.approval_authority or "",
+                    "chapter_title": "",
+                    "article_number": "",
+                    "note_label": "",
+                    "clause_label": "",
+                    "text": chunk_text,
+                    "normalized_text": norm,
+                    "chunk_index": idx,
+                    "char_count": len(chunk_text),
+                    "token_count": estimate_token_count(chunk_text),
+                    "source_type": "article" if not chunk_text.strip().startswith("تبصره") else "note",
+                    "metadata": {
+                        "source_file": file_path.name,
+                        "abs_path": str(file_path.resolve()),
+                    },
+                })
+
+            elapsed = round(time.time() - t0, 3)
+            return {
+                "document_uid": document_uid,
+                "file": str(file_path),
+                "title": title,
+                "chunks": chunks,
+                "skipped": skipped,
+                "was_update": was_update,
+                "prev_count": prev_count,
+                "elapsed": elapsed,
+            }
+
+        if workers and workers > 1:
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                futs = {ex.submit(_process_one, p): p for p in doc_paths}
+                for fut in as_completed(futs):
+                    per_doc_results.append(fut.result())
+        else:
+            for p in doc_paths:
+                per_doc_results.append(_process_one(p))
+
+        # Stage 2: merge chunks per doc into per-doc files and combined chunks.json
+        processed_doc_uids = [r["document_uid"] for r in per_doc_results if r.get("chunks")]
+        total_new_chunks = sum(len(r.get("chunks", [])) for r in per_doc_results)
+
+        if not dry_run:
+            for r in per_doc_results:
+                if not r.get("chunks"):
+                    continue
+                self._write_chunks_per_doc(r["document_uid"], r["chunks"])  
+            self._merge_chunks_json(processed_doc_uids)
+
+        # Stage 3: embeddings append
+        embedding_dim = 0
+        emb_added = 0
+        if total_new_chunks > 0:
+            if SentenceTransformer is None or np is None:
+                raise PipelineError("sentence-transformers and numpy are required for embeddings")
+            texts = [c["text"] or c["normalized_text"] for r in per_doc_results for c in r.get("chunks", [])]
+            uids = [c["chunk_uid"] for r in per_doc_results for c in r.get("chunks", [])]
+            if not dry_run:
+                embedding_dim = self._append_embeddings(texts, uids)
+                emb_added = len(texts)
+
+        # Stage 4: rebuild FAISS index from embeddings
+        if not dry_run and emb_added > 0:
+            if not HAS_FAISS:
+                self.logger.warning("FAISS not available; skipping index rebuild")
+            else:
+                self._rebuild_faiss_index()
+
+        # Stage 5: upsert into SQLite `chunks`
+        upserts = 0
+        if not dry_run and total_new_chunks > 0:
+            upserts = self._upsert_chunks_into_db(per_doc_results)
+
+        # Per-doc logging
+        for r in per_doc_results:
+            created_count = len(r.get("chunks", [])) if not r.get("was_update") else 0
+            updated_count = len(r.get("chunks", [])) if r.get("was_update") else 0
+            self.logger.info(
+                f"Doc {r.get('title', Path(r['file']).stem)} | uid={r['document_uid']} | "
+                f"created={created_count} updated={updated_count} | chunks={len(r.get('chunks', []))} | "
+                f"skipped={r.get('skipped', False)} | elapsed={r.get('elapsed', 0)}s"
+            )
+
+        duration = round(time.time() - start_ts, 2)
+        self.logger.info(
+            f"Processed docs: {len(per_doc_results)} | new_docs={len(processed_doc_uids)} | "
+            f"new_chunks={total_new_chunks} | embeddings_dim={embedding_dim} | upserts={upserts} | "
+            f"elapsed={duration}s"
+        )
+
+        return {
+            "success": True,
+            "processed_docs": len(per_doc_results),
+            "new_docs": len(processed_doc_uids),
+            "new_chunks": total_new_chunks,
+            "embeddings_dim": embedding_dim,
+            "db_upserts": upserts,
+            "duration_seconds": duration,
+        }
+
+    def _compute_document_uid(self, file_path: Path) -> str:
+        st = file_path.stat()
+        basis = f"{file_path.name}|{st.st_size}|{int(st.st_mtime)}"
+        return hashlib.sha1(basis.encode("utf-8")).hexdigest()
+
+    def _read_docx_fallback(self, file_path: Path) -> str:
+        # Minimal DOCX text extractor using zip + XML parsing
+        try:
+            with zipfile.ZipFile(file_path) as z:
+                xml_bytes = z.read("word/document.xml")
+            root = ET.fromstring(xml_bytes)
+            ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            paragraphs = []
+            for p in root.findall('.//w:p', ns):
+                runs = []
+                for t in p.findall('.//w:t', ns):
+                    if t.text:
+                        runs.append(t.text)
+                if runs:
+                    paragraphs.append(''.join(runs))
+            return '\n\n'.join(paragraphs)
+        except Exception as e:
+            raise PipelineError(f"DOCX fallback read failed: {e}")
+
+    def _load_existing_document_uids(self) -> Set[str]:
+        chunks_file = self.phase3_dir / "chunks.json"
+        doc_uids: Set[str] = set()
+        if chunks_file.exists():
+            try:
+                with open(chunks_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                chunks = data.get("chunks", data if isinstance(data, list) else [])
+                for c in chunks:
+                    uid = c.get("document_uid")
+                    if uid:
+                        doc_uids.add(uid)
+            except Exception as e:
+                self.logger.warning(f"Failed to read existing chunks.json: {e}")
+        return doc_uids
+
+    def _write_chunks_per_doc(self, document_uid: str, chunks: List[Dict[str, Any]]) -> None:
+        per_doc_dir = self.phase3_dir / "chunks_by_doc"
+        per_doc_dir.mkdir(parents=True, exist_ok=True)
+        out = per_doc_dir / f"{document_uid}.json"
+        with out.open("w", encoding="utf-8") as f:
+            json.dump({"chunks": chunks}, f, ensure_ascii=False, indent=2)
+
+    def _merge_chunks_json(self, document_uids: Iterable[str]) -> None:
+        chunks_file = self.phase3_dir / "chunks.json"
+        # Load existing
+        existing_chunks: List[Dict[str, Any]] = []
+        if chunks_file.exists():
+            try:
+                with open(chunks_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                existing_chunks = data.get("chunks", data if isinstance(data, list) else [])
+            except Exception as e:
+                self.logger.warning(f"Failed reading existing chunks.json: {e}")
+        # Remove any chunks for document_uids
+        doc_uid_set = set(document_uids)
+        existing_chunks = [c for c in existing_chunks if c.get("document_uid") not in doc_uid_set]
+        # Append per-doc chunks
+        per_doc_dir = self.phase3_dir / "chunks_by_doc"
+        for uid in doc_uid_set:
+            p = per_doc_dir / f"{uid}.json"
+            if p.exists():
+                try:
+                    with p.open("r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    existing_chunks.extend(data.get("chunks", []))
+                except Exception as e:
+                    self.logger.warning(f"Failed merging {p.name}: {e}")
+        # Write merged with stats
+        stats = {
+            "total_chunks": len(existing_chunks),
+            "documents_represented": len(set(c.get("document_uid") for c in existing_chunks)),
+        }
+        with chunks_file.open("w", encoding="utf-8") as f:
+            json.dump({"chunks": existing_chunks, "statistics": stats}, f, ensure_ascii=False, indent=2)
+
+    def _append_embeddings(self, texts: List[str], chunk_uids: List[str]) -> int:
+        model = SentenceTransformer(self.embedding_model_name)
+        embeddings = model.encode(texts, batch_size=256, convert_to_numpy=True, show_progress_bar=False, normalize_embeddings=True)
+        embeddings = embeddings.astype(np.float32)
+        dim = embeddings.shape[1]
+
+        emb_path = self.phase3_dir / "embeddings.npy"
+        meta_path = self.phase3_dir / "embeddings_meta.json"
+
+        if emb_path.exists():
+            existing = np.load(emb_path)
+            if existing.shape[1] != dim:
+                raise PipelineError(f"Embedding dimension mismatch: {existing.shape[1]} != {dim}")
+            combined = np.concatenate([existing, embeddings], axis=0)
+        else:
+            combined = embeddings
+
+        # Write embeddings
+        np.save(emb_path, combined)
+
+        # Update meta
+        meta = {"count": int(combined.shape[0]), "dimension": int(dim), "chunk_uid_order": []}
+        if meta_path.exists():
+            try:
+                with meta_path.open("r", encoding="utf-8") as f:
+                    meta_old = json.load(f)
+                # preserve previous order
+                meta["chunk_uid_order"] = meta_old.get("chunk_uid_order", [])
+            except Exception:
+                pass
+        meta["chunk_uid_order"].extend(chunk_uids)
+        with meta_path.open("w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+
+        # Track artifacts
+        self.artifacts.extend([str(emb_path), str(meta_path)])
+        return dim
+
+    def _rebuild_faiss_index(self) -> None:
+        emb_path = self.phase3_dir / "embeddings.npy"
+        meta_path = self.phase3_dir / "embeddings_meta.json"
+        if not emb_path.exists() or not meta_path.exists():
+            raise PipelineError("Embeddings not found for FAISS index rebuild")
+        embeddings = np.load(emb_path).astype(np.float32)
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        d = int(meta.get("dimension", embeddings.shape[1]))
+        index = faiss.IndexFlatIP(d)
+        faiss.normalize_L2(embeddings)
+        index.add(embeddings)
+        # Write index and mapping
+        out_dir = self.vector_db_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        faiss.write_index(index, str(out_dir / "faiss.index"))
+        mapping = {"ntotal": int(index.ntotal), "dimension": int(d), "chunk_uid_order": meta.get("chunk_uid_order", [])}
+        with (out_dir / "mapping.json").open("w", encoding="utf-8") as f:
+            json.dump(mapping, f, ensure_ascii=False, indent=2)
+        self.artifacts.extend([str(out_dir / "faiss.index"), str(out_dir / "mapping.json")])
+
+    def _upsert_chunks_into_db(self, per_doc_results: List[Dict[str, Any]]) -> int:
+        # Connect directly without executing full schema to avoid incompatibilities
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(self.db_path))
+        cur = conn.cursor()
+        # Ensure table exists
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_uid TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                chunk_uid TEXT NOT NULL,
+                text TEXT,
+                normalized_text TEXT,
+                metadata_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(document_uid, chunk_index)
+            )
+            """
+        )
+        conn.commit()
+
+        total = 0
+        for r in per_doc_results:
+            chunks = r.get("chunks", [])
+            if not chunks:
+                continue
+            # Replace all rows for this document_uid to keep chunk_index uniqueness stable
+            cur.execute("DELETE FROM chunks WHERE document_uid = ?", (r["document_uid"],))
+            for c in chunks:
+                cur.execute(
+                    """
+                    INSERT INTO chunks (document_uid, chunk_index, chunk_uid, text, normalized_text, metadata_json)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(document_uid, chunk_index) DO UPDATE SET
+                        chunk_uid=excluded.chunk_uid,
+                        text=excluded.text,
+                        normalized_text=excluded.normalized_text,
+                        metadata_json=excluded.metadata_json,
+                        updated_at=CURRENT_TIMESTAMP
+                    """,
+                    (
+                        c["document_uid"],
+                        int(c["chunk_index"]),
+                        c["chunk_uid"],
+                        c.get("text", ""),
+                        c.get("normalized_text", ""),
+                        json.dumps(c.get("metadata", {}), ensure_ascii=False),
+                    ),
+                )
+                total += 1
+        conn.commit()
+        conn.close()
+        return total
     
     def _run_phase1(self, rebuild: bool = False) -> None:
         """
@@ -576,49 +1018,31 @@ class PhasesPipeline:
 def create_cli_parser() -> argparse.ArgumentParser:
     """Create command line argument parser with help text."""
     parser = argparse.ArgumentParser(
-        description="Run complete Legal Assistant AI pipeline from phases 1-3",
+        description="Run Legal Assistant AI pipeline (incremental multi-file or legacy phases 1-3)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Usage examples:
-  python pipeline/run_phases_1_to_3.py                    # Complete run from phase 1-3
-  python pipeline/run_phases_1_to_3.py --from phase2      # Start from phase 2
-  python pipeline/run_phases_1_to_3.py --to phase1        # Only phase 1
-  python pipeline/run_phases_1_to_3.py --rebuild          # Rebuild all outputs
+  # Incremental multi-file processing (default)
+  python pipeline/run_phases_1_to_3.py --raw_dir data/raw --workers 4
+
+  # Legacy phases 1-3 (kept for compatibility)
+  python pipeline/run_phases_1_to_3.py --from phase2 --to phase3
+  python pipeline/run_phases_1_to_3.py --rebuild
         """
     )
     
-    parser.add_argument(
-        '--from', 
-        dest='from_phase',
-        choices=['phase1', 'phase2', 'phase3'],
-        default='phase1',
-        help='Starting phase (default: phase1)'
-    )
-    
-    parser.add_argument(
-        '--to',
-        dest='to_phase', 
-        choices=['phase1', 'phase2', 'phase3'],
-        default='phase3',
-        help='Ending phase (default: phase3)'
-    )
-    
-    parser.add_argument(
-        '--rebuild',
-        action='store_true',
-        help='Remove existing outputs before running'
-    )
-    
-    parser.add_argument(
-        '--config',
-        default='config/config.json',
-        help='Configuration file path (default: config/config.json)'
-    )
-    
-    parser.add_argument(
-        '--db-path',
-        help='Override database path (otherwise use config)'
-    )
+    # Incremental mode flags
+    parser.add_argument('--raw_dir', default='data/raw', help='Directory containing raw .docx files (default: data/raw)')
+    parser.add_argument('--force', action='store_true', help='Reprocess documents even if seen (default: false)')
+    parser.add_argument('--workers', type=int, default=1, help='Parallel worker count for per-file processing')
+    parser.add_argument('--dry-run', action='store_true', help='Plan only, perform no writes')
+
+    # Legacy flags (kept)
+    parser.add_argument('--from', dest='from_phase', choices=['phase1', 'phase2', 'phase3'], default='phase1', help='Legacy: start phase')
+    parser.add_argument('--to', dest='to_phase', choices=['phase1', 'phase2', 'phase3'], default='phase3', help='Legacy: end phase')
+    parser.add_argument('--rebuild', action='store_true', help='Legacy: remove outputs before running')
+    parser.add_argument('--config', default='config/config.json', help='Configuration file path (default: config/config.json)')
+    parser.add_argument('--db-path', help='Override database path (otherwise use config)')
     
     return parser
 
@@ -629,35 +1053,22 @@ def main():
     args = parser.parse_args()
     
     try:
-        # Initialize pipeline
         pipeline = PhasesPipeline(args.config)
-        
-        # Run pipeline
-        result = pipeline.run(
-            from_phase=args.from_phase,
-            to_phase=args.to_phase,
-            rebuild=args.rebuild,
-            db_path_override=args.db_path
+        # Prefer incremental path by default; legacy can still be invoked explicitly
+        inc_result = pipeline.run_incremental(
+            raw_dir=Path(args.raw_dir),
+            force=bool(args.force),
+            workers=int(args.workers or 1),
+            dry_run=bool(args.dry_run),
         )
-        
-        if result["success"]:
-            print(f"\n[SUCCESS] Pipeline completed successfully!")
-            print(f"Duration: {result['duration_seconds']} seconds")
-            print(f"Artifacts generated: {len(result['artifacts'])}")
-            
-            if result.get("artifacts"):
-                print("\nGenerated artifacts:")
-                for artifact in result["artifacts"]:
-                    print(f"  - {artifact}")
-            
-            sys.exit(0)
-        else:
-            print(f"\n[ERROR] Pipeline failed: {result.get('error', 'Unknown error')}")
-            if result.get("errors"):
-                print("\nError details:")
-                for error in result["errors"]:
-                    print(f"  - {error}")
-            sys.exit(1)
+
+        print("\n[SUCCESS] Incremental pipeline completed")
+        print(f"Processed docs: {inc_result.get('processed_docs', 0)}")
+        print(f"New chunks: {inc_result.get('new_chunks', 0)}")
+        if inc_result.get('embeddings_dim'):
+            print(f"Embedding dimension: {inc_result['embeddings_dim']}")
+        print(f"Duration: {inc_result.get('duration_seconds', 0)} seconds")
+        sys.exit(0)
             
     except KeyboardInterrupt:
         print("\n[INTERRUPTED] Execution stopped by user")

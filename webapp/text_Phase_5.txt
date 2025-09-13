@@ -10,3 +10,5 @@ The application will be available at:
 •  API Docs: http://localhost:8000/api/docs (in debug mode)
 •  Health Check: http://localhost:8000/api/health/
 •  QA Endpoint: http://localhost:8000/api/ask
+
+شرایط مرخصی اعضای هیئت علمی چیست؟

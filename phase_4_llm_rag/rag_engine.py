@@ -2,7 +2,7 @@ import json
 import sqlite3
 import argparse
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from pathlib import Path
 import os
 import re
@@ -432,13 +432,31 @@ class LegalRAGEngine:
             if results['documents']:
                 for i, doc in enumerate(results['documents'][0]):
                     metadata = results['metadatas'][0][i] if results['metadatas'] else {}
-                    chunks.append({
+
+                    # Create chunk with metadata
+                    chunk = {
                         'text': doc,
                         'document_uid': metadata.get('document_uid'),
                         'article_number': metadata.get('article_number'),
                         'note_label': metadata.get('note_label'),
                         'score': results['distances'][0][i] if results['distances'] else 0
-                    })
+                    }
+
+                    # Enrich with document title if missing
+                    if not metadata.get('document_title'):
+                        try:
+                            with sqlite3.connect(self.db_path) as conn:
+                                cursor = conn.cursor()
+                                cursor.execute("SELECT title FROM documents WHERE uid = ?",
+                                             (metadata.get('document_uid'),))
+                                result = cursor.fetchone()
+                                if result:
+                                    chunk['document_title'] = result[0]
+                        except sqlite3.Error as e:
+                            logger.warning(f"Database error getting document title: {e}")
+                            chunk['document_title'] = f"سند {metadata.get('document_uid')}"
+
+                    chunks.append(chunk)
             
             return chunks
             
@@ -486,40 +504,121 @@ class LegalRAGEngine:
         return result
     
     def build_prompt(self, question: str, retrieved_chunks: List[Dict], template_name: str = "default") -> str:
-        """Build prompt using template and retrieved chunks."""
+        """Build prompt using template and retrieved chunks with enumerated citations."""
         template = self.prompt_templates.get(template_name, self.prompt_templates["default"])
-        
-        # Concatenate retrieved chunks with consistent citations
+
+        # Ensure chunks have required metadata from database if missing
+        enriched_chunks = []
+        for chunk in retrieved_chunks:
+            enriched_chunk = self._enrich_chunk_metadata(chunk)
+            enriched_chunks.append(enriched_chunk)
+
+        # Build enumerated retrieved_text and citations_map
         retrieved_text = ""
-        for i, chunk in enumerate(retrieved_chunks, 1):
+        self._last_citations_map = []
+
+        for i, chunk in enumerate(enriched_chunks, 1):
             text = chunk.get('text', '')
             document_uid = chunk.get('document_uid', 'نامشخص')
-            document_title = chunk.get('document_title', chunk.get('title', ''))
+            document_title = chunk.get('document_title', '')
             article_number = chunk.get('article_number', '')
             note_label = chunk.get('note_label', '')
-            
-            # Build consistent citation format: [n] document_title (document_uid) - ماده number note_label
-            citation = f"[{i}] "
-            if document_title:
-                citation += f"{document_title} ({document_uid})"
-            else:
-                citation += document_uid
-            
+
+            # Format header: [1] document_title — ماده article_number/note_label
+            header = f"[{i}] {document_title}"
             if article_number:
-                citation += f" - ماده {article_number}"
-            if note_label:
-                citation += f" - {note_label}"
-            
-            retrieved_text += f"{citation}:\n{text}\n\n"
-        
+                header += f" — ماده {article_number}"
+                if note_label:
+                    header += f"/{note_label}"
+
+            retrieved_text += f"{header}\n{text}\n\n"
+
+            # Create citations_map entry
+            citation_entry = {
+                "n": i,
+                "document_uid": document_uid,
+                "title": document_title,
+                "article_number": article_number,
+                "note_label": note_label,
+                "link": f"/doc/{document_uid}?a={article_number}&n={note_label}" if article_number else f"/doc/{document_uid}"
+            }
+            self._last_citations_map.append(citation_entry)
+
         # Fill template placeholders
         prompt = template.format(
             question=question,
             retrieved_text=retrieved_text.strip()
         )
-        
+
         return prompt
-    
+
+    def _enrich_chunk_metadata(self, chunk: Dict) -> Dict:
+        """Enrich chunk with metadata from database if missing."""
+        enriched_chunk = chunk.copy()
+
+        # If we already have all required metadata, return as-is
+        if (enriched_chunk.get('document_title') and
+            enriched_chunk.get('article_number') and
+            enriched_chunk.get('note_label') is not None):
+            return enriched_chunk
+
+        document_uid = enriched_chunk.get('document_uid')
+        if not document_uid:
+            return enriched_chunk
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # Get document metadata
+                if not enriched_chunk.get('document_title'):
+                    cursor.execute("SELECT title FROM documents WHERE uid = ?", (document_uid,))
+                    result = cursor.fetchone()
+                    if result:
+                        enriched_chunk['document_title'] = result[0]
+
+                # Get chunk metadata
+                chunk_uid = enriched_chunk.get('uid') or enriched_chunk.get('chunk_uid')
+                if chunk_uid:
+                    cursor.execute("""
+                        SELECT article_number, note_label
+                        FROM chunks
+                        WHERE uid = ? OR chunk_uid = ?
+                    """, (chunk_uid, chunk_uid))
+                    result = cursor.fetchone()
+                    if result:
+                        enriched_chunk['article_number'] = result[0]
+                        enriched_chunk['note_label'] = result[1]
+
+        except sqlite3.Error as e:
+            logger.warning(f"Database error enriching chunk metadata: {e}")
+
+        # Set defaults if still missing
+        if not enriched_chunk.get('document_title'):
+            enriched_chunk['document_title'] = f"سند {document_uid}"
+        if not enriched_chunk.get('article_number'):
+            enriched_chunk['article_number'] = ""
+        if 'note_label' not in enriched_chunk:
+            enriched_chunk['note_label'] = ""
+
+        return enriched_chunk
+
+    def _extract_markers(self, answer_text: str) -> Set[int]:
+        """Extract numeric citation markers from answer text."""
+        # Find patterns like [1], [2], etc. - capturing only the numbers
+        marker_pattern = r'\[([1-9][0-9]*)\]'
+        matches = re.findall(marker_pattern, answer_text)
+        return set(int(match) for match in matches)
+
+    def _sanitize_answer_text(self, answer_text: str) -> str:
+        """Sanitize answer text to remove hex IDs while preserving normal content."""
+        # Conservative regex to remove hex-only parentheses: (hex_string)
+        # Matches patterns like (a1b2c3d4) or (ABC123) but not normal text
+        hex_pattern = r"\(([0-9a-f]{8,})\)"
+        sanitized = re.sub(hex_pattern, "", answer_text, flags=re.I)
+
+        return sanitized
+
     def generate_answer(self, prompt: str) -> Dict[str, Any]:
         """Call LLM with prompt and return answer with citations."""
         if not self.llm_client:
@@ -527,7 +626,7 @@ class LegalRAGEngine:
                 "answer": "خطا: اتصال به مدل زبانی برقرار نشد.",
                 "citations": []
             }
-        
+
         try:
             # Call LLM (implementation depends on api_connections.py)
             llm_config = self.config.get('llm', {})
@@ -537,24 +636,42 @@ class LegalRAGEngine:
                 temperature=llm_config.get('temperature', 0.3),
                 timeout_s=llm_config.get('timeout_s', 60)
             )
-            
+
             # Extract answer from response (OllamaClient.generate returns a string)
             if isinstance(response, dict):
                 answer_text = response.get('text', 'پاسخی دریافت نشد.')
             else:
                 answer_text = str(response) if response else 'پاسخی دریافت نشد.'
-            
-            # Parse citations from answer (simple implementation)
-            citations = self._extract_citations_from_answer(answer_text)
-            
-            # Validate citations
-            validated_citations = validate_citations(citations, self.db_path)
-            
+
+            # Sanitize answer text to remove hex IDs
+            sanitized_answer = self._sanitize_answer_text(answer_text)
+
+            # Extract numeric markers used in the answer
+            used_markers = self._extract_markers(sanitized_answer)
+
+            # Build final citations array by mapping markers via citations_map
+            citations = []
+            if hasattr(self, '_last_citations_map') and self._last_citations_map:
+                for marker_num in sorted(used_markers):
+                    # Find citation entry for this marker number
+                    citation_entry = next(
+                        (entry for entry in self._last_citations_map if entry['n'] == marker_num),
+                        None
+                    )
+                    if citation_entry:
+                        citations.append({
+                            "document_uid": citation_entry["document_uid"],
+                            "title": citation_entry["title"],
+                            "article_number": citation_entry["article_number"],
+                            "note_label": citation_entry["note_label"],
+                            "link": citation_entry["link"]
+                        })
+
             return {
-                "answer": answer_text,
-                "citations": validated_citations
+                "answer": sanitized_answer,
+                "citations": citations
             }
-            
+
         except Exception as e:
             logger.error(f"Error during answer generation: {e}")
             return {

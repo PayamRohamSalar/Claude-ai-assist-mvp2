@@ -79,49 +79,36 @@ function hideSections(answerSection, errorSection) {
 }
 
 function renderAnswer(result) {
-    // Render answer text (maintain paragraphs)
+    // Render answer text (keep simple paragraphs; if you add markdown support, convert here)
     const answerContent = document.getElementById('answerContent');
     if (answerContent) {
-        answerContent.innerHTML = result.answer.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
-        if (!answerContent.innerHTML.startsWith('<p>')) {
-            answerContent.innerHTML = '<p>' + answerContent.innerHTML + '</p>';
-        }
-        if (!answerContent.innerHTML.endsWith('</p>')) {
-            answerContent.innerHTML = answerContent.innerHTML.replace(/<\/p>$/, '') + '</p>';
-        }
+        const safeText = (result.answer || '').toString();
+        const html = safeText
+            .split('\n\n')
+            .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`) 
+            .join('');
+        answerContent.innerHTML = html;
     }
 
-    // Render citations with anchors
+    // Render citations with clickable titles, hide document_uid
+    const citationsBox = document.getElementById('citationsBox');
     const citationsContent = document.getElementById('citationsContent');
-    if (citationsContent) {
-        if (result.citations && result.citations.length > 0) {
-            const citationsHtml = '<h6 class="text-secondary mb-2">📖 منابع:</h6><ul class="list-unstyled">' +
-                result.citations.map((citation, index) => {
-                    let citationText = `[${index + 1}] `;
+    if (citationsContent && citationsBox) {
+        if (Array.isArray(result.citations) && result.citations.length > 0) {
+            const items = result.citations.map((c, idx) => {
+                const n = idx + 1;
+                const title = c.title || 'منبع بدون عنوان';
+                const link = c.link || '#';
+                const article = c.article_number ? ` — ماده ${c.article_number}` : '';
+                const note = c.note_label ? ` / ${c.note_label}` : '';
+                return `<div class="mb-1"><small>[${n}] <a href="${link}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${title}</a>${article}${note}</small></div>`;
+            }).join('');
 
-                    if (citation.document_title) {
-                        citationText += `<strong>${citation.document_title}</strong>`;
-                    }
-
-                    if (citation.article_number) {
-                        citationText += ` - ماده ${citation.article_number}`;
-                    }
-
-                    if (citation.note_label) {
-                        citationText += ` ${citation.note_label}`;
-                    }
-
-                    // Create anchor if link exists
-                    if (citation.link) {
-                        citationText += ` <a href="${citation.link}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">[مشاهده]</a>`;
-                    }
-
-                    return `<li class="mb-1"><small>${citationText}</small></li>`;
-                }).join('') + '</ul>';
-
-            citationsContent.innerHTML = citationsHtml;
+            citationsContent.innerHTML = items;
+            citationsBox.classList.remove('d-none');
         } else {
             citationsContent.innerHTML = '';
+            citationsBox.classList.add('d-none');
         }
     }
 
