@@ -399,12 +399,20 @@ class LegalRAGEngine:
                 chunk_with_score = chunk.copy()
                 chunk_with_score['similarity_score'] = float(1.0 / (1.0 + distance))  # Convert distance to similarity
                 results.append(chunk_with_score)
-                
-                if len(results) >= top_k:
-                    break
             
-            logger.info(f"FAISS search returned {len(results)} results")
-            return results
+            # Prefer unique documents to increase diversity while limiting to top_k
+            dedup = []
+            seen_docs = set()
+            for item in results:
+                doc_uid = item.get('document_uid')
+                if doc_uid and doc_uid in seen_docs:
+                    continue
+                seen_docs.add(doc_uid)
+                dedup.append(item)
+                if len(dedup) >= top_k:
+                    break
+            logger.info(f"FAISS search returned {len(dedup)} unique-document results")
+            return dedup
             
         except Exception as e:
             logger.error(f"Error in FAISS search: {e}")
@@ -433,22 +441,22 @@ class LegalRAGEngine:
                 for i, doc in enumerate(results['documents'][0]):
                     metadata = results['metadatas'][0][i] if results['metadatas'] else {}
 
-                    # Create chunk with metadata
+                    # Create chunk with metadata and carry document_title from Chroma metadata if present
                     chunk = {
                         'text': doc,
                         'document_uid': metadata.get('document_uid'),
+                        'document_title': metadata.get('document_title', ''),
                         'article_number': metadata.get('article_number'),
                         'note_label': metadata.get('note_label'),
                         'score': results['distances'][0][i] if results['distances'] else 0
                     }
 
-                    # Enrich with document title if missing
-                    if not metadata.get('document_title'):
+                    # Enrich with document title from DB if still missing
+                    if not chunk.get('document_title'):
                         try:
                             with sqlite3.connect(self.db_path) as conn:
                                 cursor = conn.cursor()
-                                cursor.execute("SELECT title FROM documents WHERE uid = ?",
-                                             (metadata.get('document_uid'),))
+                                cursor.execute("SELECT title FROM documents WHERE document_uid = ?", (metadata.get('document_uid'),))
                                 result = cursor.fetchone()
                                 if result:
                                     chunk['document_title'] = result[0]
@@ -572,7 +580,7 @@ class LegalRAGEngine:
 
                 # Get document metadata
                 if not enriched_chunk.get('document_title'):
-                    cursor.execute("SELECT title FROM documents WHERE uid = ?", (document_uid,))
+                    cursor.execute("SELECT title FROM documents WHERE document_uid = ?", (document_uid,))
                     result = cursor.fetchone()
                     if result:
                         enriched_chunk['document_title'] = result[0]
