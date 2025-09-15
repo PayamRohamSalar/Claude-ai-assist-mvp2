@@ -825,6 +825,9 @@ class LegalRAGEngine:
         # Step 1: Retrieve relevant chunks
         retrieved_chunks = self.retrieve(question, top_k, filters)
         
+        # Store retrieved chunks for debugging purposes
+        self._last_retrieved_chunks = retrieved_chunks
+        
         if not retrieved_chunks:
             return {
                 "answer": "متأسفانه هیچ سند مرتبطی یافت نشد.",

@@ -37,11 +37,22 @@ class Citation(BaseModel):
     note_label: Optional[str] = None
 
 
+class RetrievedChunk(BaseModel):
+    """Information about a retrieved chunk."""
+    document_title: str = Field(..., description="عنوان سند")
+    document_uid: str = Field(..., description="شناسه سند")
+    article_number: Optional[str] = Field(default="", description="شماره ماده")
+    note_label: Optional[str] = Field(default="", description="برچسب تبصره")
+    text: str = Field(..., description="متن بخش بازیابی شده")
+    similarity_score: Optional[float] = Field(default=None, description="امتیاز شباهت")
+
+
 class QuestionResponse(BaseModel):
     """Response model for legal questions."""
     answer: str = Field(..., description="پاسخ به زبان فارسی")
     citations: List[Citation] = Field(default=[], description="منابع و استنادها")
     retrieved_chunks: int = Field(..., description="تعداد اسناد بازیابی شده")
+    chunks_data: List[RetrievedChunk] = Field(default=[], description="داده‌های بخش‌های بازیابی شده")
     processing_time: float = Field(..., description="زمان پردازش به ثانیه")
     session_id: str = Field(..., description="شناسه جلسه")
     request_id: str = Field(..., description="شناسه درخواست")
@@ -94,10 +105,23 @@ async def ask_question(
                 note_label=citation.get("note_label", "")
             ))
         
+        # Format retrieved chunks for response model
+        chunks_data = []
+        for chunk in result.get("chunks_data", []):
+            chunks_data.append(RetrievedChunk(
+                document_title=chunk.get("document_title", ""),
+                document_uid=chunk.get("document_uid", ""),
+                article_number=chunk.get("article_number", ""),
+                note_label=chunk.get("note_label", ""),
+                text=chunk.get("text", ""),
+                similarity_score=chunk.get("similarity_score")
+            ))
+        
         response = QuestionResponse(
             answer=result.get("answer", "پاسخی دریافت نشد."),
             citations=citations,
             retrieved_chunks=len(result.get("citations", [])),  # Use citation count
+            chunks_data=chunks_data,
             processing_time=processing_time,
             session_id=session_id,
             request_id=request_id

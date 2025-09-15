@@ -231,12 +231,26 @@ class RAGService:
                 for c in result.get("citations", [])
             ]
 
+            # Get retrieved chunks data for debugging
+            retrieved_chunks_data = []
+            if hasattr(self._engine, '_last_retrieved_chunks') and self._engine._last_retrieved_chunks:
+                for chunk in self._engine._last_retrieved_chunks:
+                    retrieved_chunks_data.append({
+                        "document_title": chunk.get("document_title", ""),
+                        "document_uid": chunk.get("document_uid", ""),
+                        "article_number": chunk.get("article_number", ""),
+                        "note_label": chunk.get("note_label", ""),
+                        "text": chunk.get("text", ""),
+                        "similarity_score": chunk.get("similarity_score") or chunk.get("keyword_score")
+                    })
+
             processing_time = time.time() - start_time
             logger.info(f"[{trace_id}] Successfully processed question in {processing_time:.2f}s, got {len(citations)} citations")
 
             return {
                 "answer": text,
-                "citations": citations
+                "citations": citations,
+                "chunks_data": retrieved_chunks_data
             }
             
         except ServiceError:

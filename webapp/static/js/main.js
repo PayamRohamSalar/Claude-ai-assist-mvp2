@@ -90,6 +90,47 @@ function renderAnswer(result) {
         answerContent.innerHTML = html;
     }
 
+    // Render retrieved chunks for debugging
+    const retrievedChunksBox = document.getElementById('retrievedChunksBox');
+    const retrievedChunksContent = document.getElementById('retrievedChunksContent');
+    if (retrievedChunksContent && retrievedChunksBox) {
+        if (Array.isArray(result.chunks_data) && result.chunks_data.length > 0) {
+            const chunks = result.chunks_data.map((chunk, idx) => {
+                const n = idx + 1;
+                const title = chunk.document_title || 'سند نامشخص';
+                const article = chunk.article_number ? ` — ماده ${chunk.article_number}` : '';
+                const note = chunk.note_label ? ` / ${chunk.note_label}` : '';
+                const score = chunk.similarity_score ? ` (امتیاز شباهت: ${chunk.similarity_score.toFixed(3)})` : '';
+                const text = chunk.text || '';
+                const textPreview = text.length > 300 ? text.substring(0, 300) + '...' : text;
+                
+                return `
+                    <div class="mb-4 p-3 border rounded bg-white">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="fw-bold text-primary">[${n}] ${title}${article}${note}</div>
+                            <div class="badge bg-info text-dark">${score}</div>
+                        </div>
+                        <div class="small text-muted mb-2">
+                            <strong>شناسه سند:</strong> ${chunk.document_uid}
+                        </div>
+                        <div class="small text-dark">
+                            <strong>متن بازیابی شده:</strong><br>
+                            <div class="mt-1 p-2 bg-light rounded" style="font-family: 'Courier New', monospace; font-size: 0.85em; line-height: 1.4;">
+                                ${textPreview}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            retrievedChunksContent.innerHTML = chunks;
+            retrievedChunksBox.classList.remove('d-none');
+        } else {
+            retrievedChunksContent.innerHTML = '<div class="text-muted">هیچ بخشی بازیابی نشده است.</div>';
+            retrievedChunksBox.classList.remove('d-none');
+        }
+    }
+
     // Render citations with clickable titles, hide document_uid
     const citationsBox = document.getElementById('citationsBox');
     const citationsContent = document.getElementById('citationsContent');

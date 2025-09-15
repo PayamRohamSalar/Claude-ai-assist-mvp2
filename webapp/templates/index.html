@@ -140,14 +140,27 @@
                         
                         <!-- Answer Section -->
                         <div id="answerSection" class="answer-section p-4 d-none">
-                            <h5 class="text-primary mb-3">📋 پاسخ دستیار:</h5>
-                            <!-- Assistant text with [n] markers -->
-                            <div id="answerContent" class="mb-3"></div>
-                            <!-- منابع box with clickable titles -->
-                            <div id="citationsBox" class="mt-3 p-3 bg-white border rounded d-none">
-                                <h6 class="text-secondary mb-2">📖 منابع</h6>
-                                <div id="citationsContent"></div>
+                            <!-- Retrieved Chunks Section (Vector Retrieval Results) -->
+                            <div id="retrievedChunksBox" class="mb-4 p-3 bg-light border rounded d-none">
+                                <h5 class="text-info mb-3">🔍 بخش‌های بازیابی شده (نتایج جستجوی برداری):</h5>
+                                <p class="text-muted small mb-3">این بخش نشان‌دهنده اسنادی است که سیستم بر اساس شباهت معنایی پیدا کرده است:</p>
+                                <div id="retrievedChunksContent"></div>
                             </div>
+                            
+                            <!-- LLM Answer Section -->
+                            <div class="mb-4 p-3 bg-white border rounded">
+                                <h5 class="text-primary mb-3">🤖 پاسخ تولید شده توسط هوش مصنوعی:</h5>
+                                <p class="text-muted small mb-3">پاسخ زیر بر اساس بخش‌های بازیابی شده بالا تولید شده است:</p>
+                                <!-- Assistant text with [n] markers -->
+                                <div id="answerContent" class="mb-3"></div>
+                                
+                                <!-- منابع box with clickable titles -->
+                                <div id="citationsBox" class="mt-3 p-3 bg-light border rounded d-none">
+                                    <h6 class="text-secondary mb-2">📖 منابع استنادی</h6>
+                                    <div id="citationsContent"></div>
+                                </div>
+                            </div>
+                            
                             <div id="metaInfo" class="mt-3 text-muted small"></div>
                         </div>
                         
