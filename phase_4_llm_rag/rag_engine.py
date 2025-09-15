@@ -122,6 +122,9 @@ class LegalRAGEngine:
             self.config_path = config_path
         self.config = self._load_config()
         
+        # Normalize all paths relative to the project root
+        self._normalize_config_paths()
+        
         # Validate vector_store configuration
         if not self.config.get('vector_store'):
             raise ValueError(
@@ -159,6 +162,39 @@ class LegalRAGEngine:
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON in config file: {e}")
             raise
+    
+    def _normalize_config_paths(self):
+        """Normalize all paths in config to be relative to project root."""
+        # Find project root (directory containing the config or go up to find data/ directory)
+        current_dir = os.path.dirname(os.path.abspath(self.config_path))
+        project_root = current_dir
+        
+        # Go up directories until we find 'data' directory or reach root
+        while project_root != os.path.dirname(project_root):
+            if os.path.exists(os.path.join(project_root, 'data')):
+                break
+            project_root = os.path.dirname(project_root)
+        
+        def normalize_path(path):
+            if not path or os.path.isabs(path):
+                return path
+            return os.path.normpath(os.path.join(project_root, path))
+        
+        # Normalize vector store paths
+        if 'vector_store' in self.config:
+            vs_config = self.config['vector_store']
+            if 'index_path' in vs_config:
+                vs_config['index_path'] = normalize_path(vs_config['index_path'])
+            if 'embeddings_path' in vs_config:
+                vs_config['embeddings_path'] = normalize_path(vs_config['embeddings_path'])
+        
+        # Normalize other paths
+        if 'chunks_file' in self.config:
+            self.config['chunks_file'] = normalize_path(self.config['chunks_file'])
+        if 'database_path' in self.config:
+            self.config['database_path'] = normalize_path(self.config['database_path'])
+        if 'prompt_templates_path' in self.config:
+            self.config['prompt_templates_path'] = normalize_path(self.config['prompt_templates_path'])
     
     def _load_chunks(self) -> List[Dict]:
         """Load chunks from chunks.json file."""
@@ -387,8 +423,9 @@ class LegalRAGEngine:
                 chunk_uid = chunk_uid_order[idx]
                 
                 # Find the chunk with this UID
-                chunk = next((c for c in self.chunks if c.get('uid') == chunk_uid or c.get('chunk_uid') == chunk_uid), None)
+                chunk = next((c for c in self.chunks if c.get('chunk_uid') == chunk_uid), None)
                 if not chunk:
+                    logger.debug(f"Chunk with UID {chunk_uid} not found in chunks list")
                     continue
                 
                 # Apply allowed_uids filter if provided
@@ -574,6 +611,7 @@ class LegalRAGEngine:
         if not document_uid:
             return enriched_chunk
 
+        # First, try to get document title from database
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -589,21 +627,35 @@ class LegalRAGEngine:
                 chunk_uid = enriched_chunk.get('uid') or enriched_chunk.get('chunk_uid')
                 if chunk_uid:
                     cursor.execute("""
-                        SELECT article_number, note_label
+                        SELECT metadata_json
                         FROM chunks
-                        WHERE uid = ? OR chunk_uid = ?
-                    """, (chunk_uid, chunk_uid))
+                        WHERE chunk_uid = ?
+                    """, (chunk_uid,))
                     result = cursor.fetchone()
-                    if result:
-                        enriched_chunk['article_number'] = result[0]
-                        enriched_chunk['note_label'] = result[1]
+                    if result and result[0]:
+                        try:
+                            metadata = json.loads(result[0])
+                            # The metadata is already in the chunk from the JSON file
+                            # Just ensure we have the basic fields
+                            if 'article_number' not in enriched_chunk:
+                                enriched_chunk['article_number'] = ""
+                            if 'note_label' not in enriched_chunk:
+                                enriched_chunk['note_label'] = ""
+                        except json.JSONDecodeError:
+                            logger.warning(f"Invalid JSON metadata for chunk {chunk_uid}")
+                            enriched_chunk['article_number'] = ""
+                            enriched_chunk['note_label'] = ""
 
         except sqlite3.Error as e:
             logger.warning(f"Database error enriching chunk metadata: {e}")
 
-        # Set defaults if still missing
+        # Set defaults if still missing - use a more descriptive fallback
         if not enriched_chunk.get('document_title'):
-            enriched_chunk['document_title'] = f"سند {document_uid}"
+            # Try to get a more descriptive title from the chunk data itself
+            if enriched_chunk.get('document_type'):
+                enriched_chunk['document_title'] = f"{enriched_chunk['document_type']} {document_uid[:8]}..."
+            else:
+                enriched_chunk['document_title'] = f"سند {document_uid[:8]}..."
         if not enriched_chunk.get('article_number'):
             enriched_chunk['article_number'] = ""
         if 'note_label' not in enriched_chunk:

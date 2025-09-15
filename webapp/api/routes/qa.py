@@ -31,6 +31,7 @@ class QuestionRequest(BaseModel):
 class Citation(BaseModel):
     """Citation information for a legal reference."""
     document_title: Optional[str] = None
+    title: Optional[str] = None  # Alias for document_title for frontend compatibility
     document_uid: Optional[str] = None
     article_number: Optional[str] = None
     note_label: Optional[str] = None
@@ -84,8 +85,10 @@ async def ask_question(
         # Format citations for response model
         citations = []
         for citation in result.get("citations", []):
+            title = citation.get("title", "")
             citations.append(Citation(
-                document_title=citation.get("title", ""),  # Use normalized title
+                document_title=title,  # Use normalized title
+                title=title,  # Also set title field for frontend compatibility
                 document_uid=citation.get("document_uid", ""),
                 article_number=citation.get("article_number", ""),
                 note_label=citation.get("note_label", "")

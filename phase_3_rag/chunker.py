@@ -37,6 +37,9 @@ class ChunkingConfig:
     preserve_original: bool = True
     splitting_strategy: str = "sentence_aware"
     prefer_article_chunks: bool = True
+    preserve_article_note_relationships: bool = True
+    max_notes_per_chunk: int = 1
+    strict_header_boundaries: bool = True
     
     def __post_init__(self):
         if self.sentence_boundaries is None:
@@ -99,7 +102,10 @@ def load_chunking_config() -> ChunkingConfig:
                 normalize_spaces=chunking_data.get('whitespace_normalization', {}).get('normalize_spaces', True),
                 preserve_original=chunking_data.get('whitespace_normalization', {}).get('preserve_original', True),
                 splitting_strategy=chunking_data.get('splitting_strategy', 'sentence_aware'),
-                prefer_article_chunks=chunking_data.get('prefer_article_chunks', True)
+                prefer_article_chunks=chunking_data.get('prefer_article_chunks', True),
+                preserve_article_note_relationships=chunking_data.get('preserve_article_note_relationships', True),
+                max_notes_per_chunk=chunking_data.get('max_notes_per_chunk', 1),
+                strict_header_boundaries=chunking_data.get('strict_header_boundaries', True)
             )
         else:
             return ChunkingConfig()
@@ -239,7 +245,7 @@ def count_header_markers_in_chunk(chunk_text: str) -> int:
 def split_text_into_chunks(text: str, config: ChunkingConfig) -> List[str]:
     """
     Split text into chunks according to configuration rules.
-    Enhanced to handle header markers (تبصره and بند) properly.
+    Enhanced to handle legal structure (تبصره and بند) properly.
     
     Args:
         text: Text to split
@@ -253,10 +259,20 @@ def split_text_into_chunks(text: str, config: ChunkingConfig) -> List[str]:
     if not text or len(text) <= config.min_chunk_chars:
         return [text] if text else []
     
-    # Step 1: Find header markers (تبصره and بند)
+    # Step 1: Legal structure-aware splitting
+    if getattr(config, 'splitting_strategy', 'sentence_aware') == 'legal_structure_aware':
+        return _split_legal_structure_aware(text, config)
+    
+    # Step 2: Find header markers (تبصره and بند)
     header_markers = find_header_markers(text)
     
-    # Step 2: If multiple header markers found, split at each header position
+    # Step 3: Strict header boundary enforcement
+    if getattr(config, 'strict_header_boundaries', True) and len(header_markers) > 1:
+        if getattr(config, 'max_notes_per_chunk', 1) == 1:
+            logger.debug(f"Found {len(header_markers)} header markers, enforcing strict boundaries")
+            return _split_at_header_boundaries(text, header_markers, config)
+    
+    # Step 4: If multiple header markers found, split at each header position
     if len(header_markers) > 1:
         logger.debug(f"Found {len(header_markers)} header markers, splitting text")
         
@@ -353,6 +369,173 @@ def split_text_into_chunks(text: str, config: ChunkingConfig) -> List[str]:
             final_chunks.append(chunk.strip())
     
     return final_chunks
+
+
+def _split_legal_structure_aware(text: str, config: ChunkingConfig) -> List[str]:
+    """
+    Split text with full awareness of legal document structure.
+    
+    This ensures articles and their related notes stay together when possible.
+    """
+    logger = get_logger(__name__)
+    
+    # Find all legal structure markers
+    article_pattern = r'\b(ماده\s+[\d۰-۹]+|ماده\s+واحده)\b'
+    note_pattern = r'\b(تبصره\s+[\d۰-۹]+)\b'
+    clause_pattern = r'\b(بند\s+[\u0627-\u06CC]+)\b'
+    
+    # Find all markers with their positions
+    markers = []
+    
+    for match in re.finditer(article_pattern, text):
+        markers.append((match.start(), 'article', match.group()))
+    
+    for match in re.finditer(note_pattern, text):
+        markers.append((match.start(), 'note', match.group()))
+    
+    for match in re.finditer(clause_pattern, text):
+        markers.append((match.start(), 'clause', match.group()))
+    
+    # Sort by position
+    markers.sort(key=lambda x: x[0])
+    
+    if not markers:
+        # No legal structure found, fall back to regular chunking
+        return _split_by_sentences(text, config)
+    
+    # Split text into logical legal units
+    chunks = []
+    last_pos = 0
+    current_article = None
+    current_article_text = ""
+    
+    for pos, marker_type, marker_text in markers:
+        if marker_type == 'article':
+            # Save previous article if exists
+            if current_article and current_article_text.strip():
+                article_chunks = _finalize_article_chunk(current_article_text, config)
+                chunks.extend(article_chunks)
+            
+            # Start new article
+            current_article = marker_text
+            current_article_text = text[last_pos:pos].strip()
+            if current_article_text:
+                current_article_text += "\n\n"
+            current_article_text += text[pos:]
+            last_pos = len(text)  # Mark end
+            break
+        
+        elif marker_type == 'note' and current_article:
+            # Add note to current article if preservation is enabled
+            if getattr(config, 'preserve_article_note_relationships', True):
+                continue  # Keep note with article
+            else:
+                # Split note separately
+                note_start = pos
+                note_end = _find_next_marker_pos(text, pos + len(marker_text), markers)
+                note_text = text[note_start:note_end].strip()
+                if note_text and len(note_text) >= config.min_chunk_chars:
+                    chunks.append(note_text)
+    
+    # Handle remaining text
+    if current_article and current_article_text.strip():
+        article_chunks = _finalize_article_chunk(current_article_text, config)
+        chunks.extend(article_chunks)
+    elif not current_article and last_pos < len(text):
+        remaining_text = text[last_pos:].strip()
+        if remaining_text:
+            remaining_chunks = _split_by_sentences(remaining_text, config)
+            chunks.extend(remaining_chunks)
+    
+    return [chunk for chunk in chunks if chunk.strip()]
+
+
+def _split_at_header_boundaries(text: str, header_markers: List[Tuple[int, str]], config: ChunkingConfig) -> List[str]:
+    """Split text strictly at header boundaries, ensuring one header per chunk."""
+    chunks = []
+    last_pos = 0
+    
+    for pos, marker in header_markers:
+        # Add text before this marker as a chunk
+        if pos > last_pos:
+            chunk_text = text[last_pos:pos].strip()
+            if chunk_text and len(chunk_text) >= config.min_chunk_chars:
+                chunks.append(chunk_text)
+        
+        # Find end of this header section
+        next_pos = len(text)
+        current_idx = header_markers.index((pos, marker))
+        if current_idx + 1 < len(header_markers):
+            next_pos = header_markers[current_idx + 1][0]
+        
+        # Add this header section as a chunk
+        header_chunk = text[pos:next_pos].strip()
+        if header_chunk:
+            chunks.append(header_chunk)
+        
+        last_pos = next_pos
+    
+    return [chunk for chunk in chunks if chunk.strip()]
+
+
+def _finalize_article_chunk(article_text: str, config: ChunkingConfig) -> List[str]:
+    """Finalize an article chunk, splitting if too large."""
+    if len(article_text) <= config.max_chunk_chars:
+        return [article_text]
+    
+    # Article is too large, need to split carefully
+    return _split_by_sentences(article_text, config)
+
+
+def _split_by_sentences(text: str, config: ChunkingConfig) -> List[str]:
+    """Split text by sentences with overlap."""
+    chunks = []
+    boundaries = find_sentence_boundaries(text, config)
+    
+    if not boundaries:
+        # Fallback: split by character count
+        start = 0
+        while start < len(text):
+            end = min(start + config.max_chunk_chars, len(text))
+            chunks.append(text[start:end])
+            start = end - config.overlap_chars if end < len(text) else end
+        return chunks
+    
+    # Split by sentence boundaries with overlap
+    start = 0
+    current_chunk = ""
+    
+    for boundary in boundaries:
+        sentence = text[start:boundary]
+        
+        # If adding this sentence would exceed max chars, finalize current chunk
+        if current_chunk and len(current_chunk + sentence) > config.max_chunk_chars:
+            if len(current_chunk) >= config.min_chunk_chars:
+                chunks.append(current_chunk.strip())
+                
+                # Start new chunk with overlap
+                overlap_start = max(0, len(current_chunk) - config.overlap_chars)
+                current_chunk = current_chunk[overlap_start:] + sentence
+            else:
+                current_chunk += sentence
+        else:
+            current_chunk += sentence
+        
+        start = boundary
+    
+    # Add final chunk
+    if current_chunk.strip():
+        chunks.append(current_chunk.strip())
+    
+    return chunks
+
+
+def _find_next_marker_pos(text: str, start_pos: int, markers: List[Tuple[int, str, str]]) -> int:
+    """Find position of next marker after start_pos."""
+    for pos, _, _ in markers:
+        if pos > start_pos:
+            return pos
+    return len(text)
 
 
 def get_database_connection(db_path: Optional[str] = None) -> sqlite3.Connection:

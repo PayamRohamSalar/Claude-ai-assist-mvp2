@@ -206,6 +206,55 @@ BEGIN
 END;
 
 -- ========================================
+-- CHUNKS TABLE FOR RAG
+-- ========================================
+
+-- Chunks table: Processed text chunks for RAG retrieval
+CREATE TABLE IF NOT EXISTS chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chunk_uid TEXT NOT NULL UNIQUE,
+    document_uid TEXT NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    text TEXT,
+    normalized_text TEXT,
+    metadata_json TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(document_uid, chunk_index)
+);
+
+-- Index for chunk retrieval
+CREATE INDEX IF NOT EXISTS idx_chunks_document_uid ON chunks(document_uid);
+CREATE INDEX IF NOT EXISTS idx_chunks_chunk_uid ON chunks(chunk_uid);
+
+-- Chunks FTS table for full-text search
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+    text,
+    normalized_text,
+    content='chunks',
+    content_rowid='id',
+    tokenize='unicode61 remove_diacritics 1 tokenchars ''ابپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی‌آأإٱٲٳٴٵٶٷٸٹٺٻټٽپژچکگڈڑںۂۃ'''
+);
+
+-- Chunks triggers
+CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
+    INSERT INTO chunks_fts(rowid, text, normalized_text) 
+    VALUES (new.id, new.text, new.normalized_text);
+END;
+
+CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
+    INSERT INTO chunks_fts(chunks_fts, rowid, text, normalized_text) 
+    VALUES ('delete', old.id, old.text, old.normalized_text);
+END;
+
+CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
+    INSERT INTO chunks_fts(chunks_fts, rowid, text, normalized_text) 
+    VALUES ('delete', old.id, old.text, old.normalized_text);
+    INSERT INTO chunks_fts(rowid, text, normalized_text) 
+    VALUES (new.id, new.text, new.normalized_text);
+END;
+
+-- ========================================
 -- UTILITY VIEWS
 -- ========================================
 

@@ -1,9 +1,9 @@
 {
   "chunking": {
-    "max_chunk_chars": 1000,
-    "min_chunk_chars": 100,
-    "overlap_chars": 150,
-    "overlap_ratio": 0.15,
+    "max_chunk_chars": 800,
+    "min_chunk_chars": 50,
+    "overlap_chars": 100,
+    "overlap_ratio": 0.1,
     "sentence_boundaries": {
       "primary": [".", "؟", "!", "…"],
       "secondary": ["،", "؛"]
@@ -14,10 +14,13 @@
       "preserve_original": true,
       "remove_extra_newlines": true
     },
-    "splitting_strategy": "sentence_aware",
+    "splitting_strategy": "legal_structure_aware",
     "prefer_article_chunks": true,
-    "split_long_notes": true,
-    "split_long_clauses": false
+    "split_long_notes": false,
+    "split_long_clauses": false,
+    "preserve_article_note_relationships": true,
+    "max_notes_per_chunk": 1,
+    "strict_header_boundaries": true
   },
   "output": {
     "chunks_file": "data/processed_phase_3/chunks.json",
