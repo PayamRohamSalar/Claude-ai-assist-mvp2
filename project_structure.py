@@ -7,16 +7,27 @@ Creates the complete directory structure for the project
 
 import os
 import sys
+import argparse
 from pathlib import Path
 
 
-def create_directory_structure():
+def create_directory_structure(base_dir=None):
     """
     Create the complete directory structure for the legal assistant project
+    
+    Args:
+        base_dir (Path, optional): Base directory for the project structure.
+                                 Defaults to the repository root (parent of this script).
+    
+    Returns:
+        bool: True if successful, False otherwise
     """
     
-    # Base project directory
-    base_dir = Path("D:\OneDrive\AI-Project\Claude-ai-assist-mvp2")
+    # Use provided base_dir or default to repository root
+    if base_dir is None:
+        base_dir = Path(__file__).resolve().parent
+    else:
+        base_dir = Path(base_dir).resolve()
     
     # Directory structure definition
     directories = [
@@ -46,7 +57,7 @@ def create_directory_structure():
     try:
         # Create base directory
         base_dir.mkdir(exist_ok=True)
-        print(f"✅ دایرکتوری اصلی ایجاد شد: {base_dir}")
+        print(f"✅ دایرکتوری اصلی ایجاد شد: {base_dir.absolute()}")
         
         # Create all subdirectories
         for directory in directories:
@@ -111,17 +122,38 @@ def display_tree(directory, prefix="", max_depth=3, current_depth=0):
 
 
 def main():
-    """Main execution function"""
+    """Main execution function with CLI argument support"""
+    parser = argparse.ArgumentParser(
+        description="Create directory structure for Legal Assistant AI project",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python project_structure.py                    # Use current directory
+  python project_structure.py -d /path/to/project  # Use specified directory
+  python project_structure.py --directory /home/user/my_project
+        """
+    )
+    
+    parser.add_argument(
+        '-d', '--directory',
+        type=str,
+        help='Base directory for the project structure (default: repository root)'
+    )
+    
+    args = parser.parse_args()
+    
     print("=" * 60)
     print("🏗️  Legal Assistant Project - Structure Creator")
     print("=" * 60)
     
-    success = create_directory_structure()
+    # Use CLI argument if provided, otherwise use default (None)
+    base_dir = args.directory if args.directory else None
+    
+    success = create_directory_structure(base_dir)
     
     if success:
         print("\n✅ مرحله بعد: ایجاد محیط مجازی با miniconda")
         print("📝 دستورات پیشنهادی:")
-        print("   cd legal_assistant_project")
         print("   conda create -n legal_assistant python=3.11")
         print("   conda activate legal_assistant")
     else:

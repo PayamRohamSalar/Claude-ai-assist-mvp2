@@ -120,7 +120,7 @@ async def ask_question(
         response = QuestionResponse(
             answer=result.get("answer", "پاسخی دریافت نشد."),
             citations=citations,
-            retrieved_chunks=len(result.get("citations", [])),  # Use citation count
+            retrieved_chunks=len(chunks_data),  # Use actual chunk count, not citation count
             chunks_data=chunks_data,
             processing_time=processing_time,
             session_id=session_id,

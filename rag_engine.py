@@ -134,38 +134,22 @@ class LegalRAGEngine:
     def _create_default_config(self) -> Dict[str, Any]:
         """Create default RAG configuration."""
         return {
-            "vector_database": {
-                "backend": "faiss",
-                "faiss_index_path": "data/processed_phase_3/vector_db/faiss/faiss.index",
-                "faiss_mapping_path": "data/processed_phase_3/vector_db/faiss/mapping.json",
-                "chroma_db_path": "data/processed_phase_3/vector_db/chroma"
+            "vector_store": {
+                "type": "faiss",
+                "index_path": "data/processed_phase_3/vector_db/faiss/faiss.index",
+                "embeddings_path": "data/processed_phase_3/embeddings.npy"
             },
-            "chunks": {
-                "chunks_file": "data/processed_phase_3/chunks.json",
-                "embeddings_meta_file": "data/processed_phase_3/embeddings_meta.json"
-            },
-            "database": {
-                "db_path": "data/db/legal_assistant.db"
-            },
-            "embedding_model": {
-                "model_name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-                "cache_folder": None
-            },
+            "chunks_file": "data/processed_phase_3/chunks.json",
+            "database_path": "data/db/legal_assistant.db",
+            "prompt_templates_path": "phase_4_llm_rag/prompt_templates.json",
             "llm": {
                 "provider": "ollama",
-                "base_url": "http://localhost:11434",
-                "model": "llama3:8b",
-                "timeout": 30,
-                "max_tokens": 2048,
-                "temperature": 0.1
-            },
-            "retrieval": {
-                "default_top_k": 5,
-                "max_top_k": 20,
-                "similarity_threshold": 0.3,
-                "max_content_length": 8000
-            },
-            "prompt_templates_file": "prompt_templates.json"
+                "model": "qwen2.5:7b-instruct",
+                "backup_model": "mistral:7b",
+                "temperature": 0.2,
+                "max_tokens": 1800,
+                "timeout_s": 60
+            }
         }
     
     def _initialize_components(self):
@@ -192,42 +176,54 @@ class LegalRAGEngine:
     
     def _load_vector_backend(self):
         """Load vector database backend (FAISS or Chroma)."""
-        # Auto-detect available backend since config doesn't specify
-        if HAS_FAISS:
+        vector_store_config = self.config.get("vector_store", {})
+        vector_store_type = vector_store_config.get("type", "faiss").lower()
+        
+        if vector_store_type == "faiss":
             self._load_faiss_backend()
             self.logger.info("Vector backend loaded: FAISS")
-        elif HAS_CHROMA:
+        elif vector_store_type == "chroma":
             self._load_chroma_backend()
             self.logger.info("Vector backend loaded: Chroma")
         else:
-            raise RAGEngineError("Neither FAISS nor Chroma is available. Please install one of them.")
+            raise RAGEngineError(f"Unsupported vector store type: {vector_store_type}")
     
     def _load_faiss_backend(self):
         """Load FAISS vector database."""
         if not HAS_FAISS:
             raise RAGEngineError("FAISS library not available")
         
-        # Use Phase 3 outputs for embeddings and metadata
-        embeddings_file = Path("data/processed_phase_3/embeddings.npy")
-        metadata_file = Path("data/processed_phase_3/embeddings_meta.json")
+        vector_store_config = self.config.get("vector_store", {})
+        index_path = vector_store_config.get("index_path")
+        embeddings_path = vector_store_config.get("embeddings_path")
         
-        if not embeddings_file.exists():
-            raise RAGEngineError(f"Embeddings file not found: {embeddings_file}")
-        if not metadata_file.exists():
-            raise RAGEngineError(f"Metadata file not found: {metadata_file}")
+        if not index_path:
+            raise RAGEngineError("vector_store.index_path is required for FAISS backend")
         
-        # Load embeddings and metadata
-        embeddings = np.load(embeddings_file)
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
+        index_path = Path(index_path)
+        if not index_path.exists():
+            raise RAGEngineError(f"FAISS index file not found: {index_path}")
         
-        # Create FAISS index
-        dimension = metadata.get("dimension", embeddings.shape[1])
-        index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
+        # Load the persisted FAISS index
+        index = faiss.read_index(str(index_path))
         
-        # Normalize embeddings for cosine similarity
-        faiss.normalize_L2(embeddings)
-        index.add(embeddings)
+        # Load embeddings if path is provided
+        embeddings = None
+        if embeddings_path:
+            embeddings_path = Path(embeddings_path)
+            if embeddings_path.exists():
+                embeddings = np.load(embeddings_path)
+            else:
+                self.logger.warning(f"Embeddings file not found: {embeddings_path}")
+        
+        # Load metadata
+        metadata_file = index_path.parent / "embeddings_meta.json"
+        metadata = {}
+        if metadata_file.exists():
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+        else:
+            self.logger.warning(f"Metadata file not found: {metadata_file}")
         
         self.vector_backend = {
             'type': 'faiss',
@@ -242,8 +238,14 @@ class LegalRAGEngine:
         if not HAS_CHROMA:
             raise RAGEngineError("ChromaDB library not available")
         
-        # Use database vector_db_path from config
-        db_path = Path(self.config.get("database", {}).get("vector_db_path", "data/vector_db"))
+        vector_store_config = self.config.get("vector_store", {})
+        db_path = vector_store_config.get("db_path", "data/processed_phase_3/vector_db/chroma")
+        collection_name = vector_store_config.get("collection_name", "legal_chunks")
+        
+        if not db_path:
+            raise RAGEngineError("vector_store.db_path is required for ChromaDB backend")
+        
+        db_path = Path(db_path)
         
         # Create ChromaDB client
         try:
@@ -254,10 +256,10 @@ class LegalRAGEngine:
             
             # Get or create collection
             try:
-                collection = client.get_collection("legal_chunks")
+                collection = client.get_collection(collection_name)
             except:
                 # If collection doesn't exist, we'll need to create it from our data
-                collection = client.create_collection("legal_chunks")
+                collection = client.create_collection(collection_name)
                 # TODO: Populate collection with embeddings and chunks
             
             self.vector_backend = {
@@ -270,8 +272,11 @@ class LegalRAGEngine:
     
     def _load_chunks(self):
         """Load text chunks from JSON file."""
-        chunks_file = Path("data/processed_phase_3/chunks.json")
+        chunks_file_path = self.config.get("chunks_file")
+        if not chunks_file_path:
+            raise RAGEngineError("chunks_file is required in config")
         
+        chunks_file = Path(chunks_file_path)
         if not chunks_file.exists():
             raise RAGEngineError(f"Chunks file not found: {chunks_file}")
         
@@ -293,18 +298,12 @@ class LegalRAGEngine:
     
     def _connect_database(self):
         """Connect to SQLite database for structural filters."""
-        # Use the actual database path from config URL
-        db_url = self.config["database"]["url"]
-        if db_url.startswith("sqlite:///"):
-            db_path_str = db_url.replace("sqlite:///", "")
-            # Handle relative paths properly
-            if not Path(db_path_str).is_absolute():
-                db_path = Path("data/db") / Path(db_path_str).name
-            else:
-                db_path = Path(db_path_str)
-        else:
-            db_path = Path("data/db/legal_assistant.db")  # Default fallback
+        # Use the new database_path config key
+        db_path_str = self.config.get("database_path")
+        if not db_path_str:
+            raise RAGEngineError("database_path is required in config")
         
+        db_path = Path(db_path_str)
         if not db_path.exists():
             raise RAGEngineError(f"Database not found: {db_path}")
         
@@ -322,8 +321,18 @@ class LegalRAGEngine:
             return
         
         try:
-            # Use the embedding model from RAG config section
-            model_name = self.config["rag"]["embedding_model"]
+            # Get model name from metadata or use default
+            model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"  # Default
+            
+            # Try to get from vector backend metadata if available
+            if self.vector_backend and 'metadata' in self.vector_backend:
+                metadata_model = self.vector_backend['metadata'].get('model_name')
+                if metadata_model:
+                    model_name = metadata_model
+            
+            # Remove 'sentence-transformers/' prefix if present for loading
+            if model_name.startswith('sentence-transformers/'):
+                model_name = model_name.replace('sentence-transformers/', '')
             
             self.embedding_model = SentenceTransformer(model_name)
             self.logger.info(f"Embedding model loaded: {model_name}")
@@ -334,15 +343,13 @@ class LegalRAGEngine:
     
     def _load_prompt_templates(self):
         """Load prompt templates from JSON file."""
-        templates_file = Path("config/prompt_templates.json")
+        templates_file_path = self.config.get("prompt_templates_path")
+        if not templates_file_path:
+            raise RAGEngineError("prompt_templates_path is required in config")
         
+        templates_file = Path(templates_file_path)
         if not templates_file.exists():
-            # Create default templates
-            default_templates = self._create_default_templates()
-            templates_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(templates_file, 'w', encoding='utf-8') as f:
-                json.dump(default_templates, f, indent=2, ensure_ascii=False)
-            self.logger.info(f"Created default prompt templates: {templates_file}")
+            raise RAGEngineError(f"Prompt templates file not found: {templates_file}")
         
         try:
             with open(templates_file, 'r', encoding='utf-8') as f:
@@ -389,9 +396,15 @@ class LegalRAGEngine:
         }
     
     def _initialize_llm_client(self):
-        """Initialize LLM client (Ollama by default)."""
-        # Default to Ollama since no provider specified in config
-        self._initialize_ollama_client()
+        """Initialize LLM client based on provider in config."""
+        llm_config = self.config.get("llm", {})
+        provider = llm_config.get("provider", "ollama").lower()
+        
+        if provider == "ollama":
+            self._initialize_ollama_client()
+        else:
+            self.logger.warning(f"Unsupported LLM provider: {provider}. Defaulting to Ollama.")
+            self._initialize_ollama_client()
     
     def _initialize_ollama_client(self):
         """Initialize Ollama client."""
@@ -399,13 +412,16 @@ class LegalRAGEngine:
             self.logger.warning("Requests library not available - LLM generation disabled")
             return
         
+        llm_config = self.config.get("llm", {})
+        
+        # Use new config keys
         self.llm_client = {
             'type': 'ollama',
-            'base_url': self.config["llm"]["ollama_base_url"],
-            'model': self.config["llm"]["ollama_model"],
-            'timeout': self.config["llm"]["ollama_timeout"],
-            'max_tokens': self.config["llm"]["max_tokens"],
-            'temperature': self.config["llm"]["temperature"]
+            'base_url': llm_config.get("base_url", "http://localhost:11434"),
+            'model': llm_config.get("model", "qwen2.5:7b-instruct"),
+            'timeout': llm_config.get("timeout_s", 60),
+            'max_tokens': llm_config.get("max_tokens", 1800),
+            'temperature': llm_config.get("temperature", 0.2)
         }
         
         # Test connection
@@ -448,7 +464,7 @@ class LegalRAGEngine:
             raise RAGEngineError("Empty question provided")
         
         # Validate top_k
-        max_k = self.config["rag"].get("max_search_results", 10)
+        max_k = 20  # Default max for safety
         top_k = min(max(1, top_k), max_k)
         
         self.logger.info(f"Retrieving {top_k} chunks for question: {question[:50]}...")
@@ -700,8 +716,8 @@ class LegalRAGEngine:
             retrieved_chunks=chunks_text
         )
         
-        # Trim if too long
-        max_length = self.config["retrieval"]["max_content_length"]
+        # Trim if too long (default max length)
+        max_length = 8000  # Default max content length
         if len(prompt) > max_length:
             # Trim from the chunks section
             available_space = max_length - len(template.format(question=question, retrieved_chunks=""))
@@ -795,8 +811,8 @@ class LegalRAGEngine:
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": self.config["llm"].get("temperature", 0.1),
-                "num_predict": self.config["llm"].get("max_tokens", 2048)
+                "temperature": self.llm_client.get("temperature", 0.2),
+                "num_predict": self.llm_client.get("max_tokens", 1800)
             }
         }
         
@@ -881,7 +897,7 @@ class LegalRAGEngine:
         
         try:
             # Step 1: Retrieve relevant chunks
-            top_k = kwargs.get('top_k', self.config["retrieval"]["default_top_k"])
+            top_k = kwargs.get('top_k', 5)  # Default top_k
             filters = kwargs.get('filters')
             
             retrieved_chunks = self.retrieve(question, top_k=top_k, filters=filters)
