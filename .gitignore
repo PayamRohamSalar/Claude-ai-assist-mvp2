@@ -85,10 +85,12 @@ logs/
 *.log.*
 
 # Data files (sensitive content)
+# Allow legal documents in data/raw
 #data/raw/*
 #data/processed_*/*
 !data/raw/README.md
 !data/*/README.md
+!data/raw/*.docx
 
 # Vector embeddings and models
 embeddings/
@@ -156,7 +158,7 @@ site/
 # Large files that shouldn't be in git
 *.pdf
 *.doc
-*.docx
+# *.docx  # Allow .docx files in data/raw for legal documents
 *.xls
 *.xlsx
 *.ppt
